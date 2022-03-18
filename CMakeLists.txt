@@ -7,7 +7,7 @@ cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug ..
 cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
 ]]
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.16)
 project(nes_sockets VERSION 5)
 
 add_compile_options(-Wall -Wextra -pedantic -Werror)
