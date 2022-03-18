@@ -1,0 +1,21 @@
+-------------------------------------------------------------------------------------------------------
+??/??/???? - Nicolas Daniel Engels
+  v2 => 15/08/2019 ** Adicionado suporte a SSL (tls_socket).
+  v3 => 26/10/2020 ** Atualizado para usar span e socket_util
+  v4 => 24/10/2021 ** Atualizado melhorias Poup
+  v5 => 04/02/2022 ** Usar CMake como build
+  v6 => 18/03/2022 ** Versionamento privado no Github
+
+nes_sockets: Biblioteca para uso de sockets (Win/Unix); Sendo versão compacta da usada pelo Poup.
+
+Dependências:
+  C++20
+  ws2_32 - Windows Socket2
+  ssl crypto - Openssl
+
+Usa CMake para compilar. Na pasta ./build/ rodar:
+
+cmake --build .
+
+Gerará o arquivo compilado em forma de bibilioteca estática (nes_sockets.a) que deve ser linkado para
+consumir a biblioteca.
