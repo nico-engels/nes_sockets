@@ -1,11 +1,15 @@
 #~~~ nes_sockets - Nicolas Engels
 
-#[[ -- Windows Mingw64
+#[[
+-- Windows Mingw64
 cd build
 set PATH=%PATH%;C:\msys64\mingw64\bin\
 cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug ..
 cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
+
+-- PI
+cmake -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc-10 -DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++-10
 ]]
 cmake_minimum_required(VERSION 3.16)
 project(nes_sockets VERSION 5)
