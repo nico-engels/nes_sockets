@@ -1,11 +1,17 @@
 #~~~ nes_sockets - Nicolas Engels
 
 #[[
--- Windows Mingw64
 cd build
+
+-- Windows Mingw64
 set PATH=%PATH%;C:\msys64\mingw64\bin\
 cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug ..
 cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+cmake --build .
+
+-- Windows MSVC++
+set PATH=%PATH%;"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\"
+cmake -G "Visual Studio 17 2022" ..
 cmake --build .
 
 -- PI
@@ -14,7 +20,11 @@ cmake -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabih
 cmake_minimum_required(VERSION 3.16)
 project(nes_sockets VERSION 5)
 
-add_compile_options(-Wall -Wextra -pedantic -Werror)
+if(MSVC)
+  add_compile_options(/W4 /WX)
+else()
+  add_compile_options(-Wall -Wextra -pedantic -Werror)
+endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)

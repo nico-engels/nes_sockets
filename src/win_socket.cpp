@@ -1,5 +1,6 @@
 #include "win_socket.h"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -146,7 +147,7 @@ namespace nes::so {
     addrinfo_raii addr { end_res };
 
     // Liga o servidor ao endereço passando a estrutura
-    if (bind(sock_serv.handle(), end_res->ai_addr, static_cast<int>(end_res->ai_addrlen)))
+    if (::bind(sock_serv.handle(), end_res->ai_addr, static_cast<int>(end_res->ai_addrlen)))
       throw runtime_error { "win_socket::escutar() escutar na porta " + to_string(porta) + " !" };
 
     // Define o socket servidor como assíncrono
@@ -223,7 +224,13 @@ namespace nes::so {
       // Cria o novo socket recebido
       win_socket ret;
       ret.m_winsocket = socket_cli;
-      ret.m_end_ipv4 = inet_ntoa(cliente_info.sin_addr);
+      //ret.m_end_ipv4 = inet_ntoa(cliente_info.sin_addr);
+      // xxx.xxx.xxx.xxx
+      ret.m_end_ipv4.resize(15);
+      if (!inet_ntop(AF_INET, reinterpret_cast<const void*>(&cliente_info.sin_addr),
+                     ret.m_end_ipv4.data(), ret.m_end_ipv4.size()))
+        throw runtime_error { "inet_ntop falhou" };;
+
       ret.m_porta_ipv4 = ntohs(cliente_info.sin_port);
 
       // Seta como não bloqueia
@@ -356,7 +363,7 @@ namespace nes::so {
     // Enquanto houver dados a receber ou a conexão estiver ativa
     while (true)
     {
-      auto qtde = recv(m_winsocket, reinterpret_cast<char*>(dados.data()), dados.size(), 0);
+      auto qtde = recv(m_winsocket, reinterpret_cast<char*>(dados.data()), static_cast<int>(dados.size()), 0);
 
       // Recebe os dados do socket, não bloqueia
       if (qtde == SOCKET_ERROR)

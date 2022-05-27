@@ -18,7 +18,7 @@ namespace nes::net {
     return cfg::net::intervalo_passo + milliseconds { static_cast<milliseconds::rep>(intervalo_dif * tentativas_prop) };
   }
 
-  // Funções de entrada io
+  // FunÃ§Ãµes de entrada io
   template <class S, class R, class P>
   pair<vector<byte>, ptrdiff_t> receber_ate_delim(S& sock, span<const byte> delim, duration<R, P> tempo_exp, size_t tam_max)
   {
@@ -33,10 +33,10 @@ namespace nes::net {
       // Se recebeu dados
       if (dados.size() > 0)
       {
-        // Verificação para não receber muitooos dados
+        // VerificaÃ§Ã£o para nÃ£o receber muitooos dados
         if (ret.size() + dados.size() > tam_max)
           throw socket_rec_excedente { "Recebeu mais dados (" + to_string(ret.size() + dados.size()) +
-            "B) que o máximo (" + to_string(tam_max) + "B)!" };
+            " B) que o mÃ¡ximo (" + to_string(tam_max) + " B)!" };
 
         // Adiciona ao retorno e procura o delimitador
         ret.insert(ret.end(), dados.begin(), dados.end());
@@ -68,7 +68,7 @@ namespace nes::net {
       // Se recebeu dados
       if (dados.size() > 0)
       {
-        // Verificação para não receber muitooos dados
+        // VerificaÃ§Ã£o para nÃ£o receber muitooos dados
         if (ret.size() + dados.size() > tam)
           throw socket_rec_excedente { "Recebeu mais dados (" + to_string(ret.size() + dados.size()) +
             "B) que o tamanho especificado (" + to_string(tam) + "B)!" };
@@ -85,7 +85,7 @@ namespace nes::net {
 
     // Chegou aqui estourou o tempo
     throw socket_rec_expirado { "Tempo de espera " + to_string(tempo_exp.count()) + " expirado! "
-      "Não chegou ao tamanho " + to_string(tam) + " Bytes! Recebeu " + to_string(ret.size()) + " Bytes!" };
+      "NÃ£o chegou ao tamanho " + to_string(tam) + " Bytes! Recebeu " + to_string(ret.size()) + " Bytes!" };
   }
 
   template <class S, class R, class P>
@@ -114,7 +114,7 @@ namespace nes::net {
 
     // Chegou aqui estourou o tempo
     throw socket_rec_expirado { "Tempo de espera " + to_string(tempo_exp.count()) + " expirado! "
-      "Não recebeu ao menos " + to_string(tam) + " Bytes ! Recebeu " + to_string(ret.size()) + " Bytes!" };
+      "NÃ£o recebeu ao menos " + to_string(tam) + " Bytes ! Recebeu " + to_string(ret.size()) + " Bytes!" };
   }
 
   template <class S, class R, class P>
@@ -127,8 +127,8 @@ namespace nes::net {
     }
   }
 
-  // Instanciações do template, devem vir ao final para funcionar no gcc e clang
-  // Instância as utilizações
+  // InstanciaÃ§Ãµes do template, devem vir ao final para funcionar no gcc e clang
+  // InstÃ¢ncia as utilizaÃ§Ãµes
   template pair<vector<byte>, ptrdiff_t> receber_ate_delim(socket&, span<const byte>, seconds, size_t);
   template pair<vector<byte>, ptrdiff_t> receber_ate_delim(socket&, span<const byte>, milliseconds, size_t);
   template vector<byte> receber_ate_tam(socket&, size_t, seconds);

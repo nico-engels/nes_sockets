@@ -70,10 +70,7 @@ namespace nes::net {
   template <class S>
   void socket_tmpl<S>::enviar(string_view dados_str)
   {
-    // Enquando não for adicionado std::span (C++20) faz assim
-    const byte* b = reinterpret_cast<const byte*>(&*dados_str.begin());
-    const byte* e = reinterpret_cast<const byte*>(&*dados_str.end());
-    m_sock_so.enviar({ b, e });
+    m_sock_so.enviar(as_bytes(span { dados_str.begin(), dados_str.end() }));
   }
 
   template <class S>

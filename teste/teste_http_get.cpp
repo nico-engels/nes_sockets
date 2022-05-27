@@ -88,27 +88,7 @@ try {
 */
     /*
     {
-      socket c("google.com", 80);
-
-      string_view req("GET / HTTP/1.1\r\n"
-                      "Host: google.com\r\n"
-                      "Connection: close\r\n"
-                      "\r\n");
-
-      cout << "> Enviar req (" << req.size() << " bytes):" << endl;
-      printa_str_bin(req.begin(), req.end());
-      c.enviar(req);
-
-      sleep_for(1s);
-
-      auto resp = c.receber();
-      cout << "< Dados recebidos (" << resp.size() << " bytes):\n";
-      printa_str_bin(resp.begin(), resp.end());
-    }
-    */
-
-    {
-      tls_socket c("api.sologenic.org", 443);
+      socket c("api.sologenic.org", 80);
 
       string_view req("GET / HTTP/1.1\r\n"
                       "Host: api.sologenic.org\r\n"
@@ -125,6 +105,72 @@ try {
       cout << "< Dados recebidos (" << resp.size() << " bytes):\n";
       printa_str_bin(resp.begin(), resp.end());
     }
+    */
+
+    {
+      tls_socket c("google.com", 443);
+
+      string_view req("GET / HTTP/1.1\r\n"
+                      "Host: google.com\r\n"
+                      "Connection: close\r\n"
+                      "\r\n");
+
+      cout << "> Enviar req (" << req.size() << " bytes):" << endl;
+      printa_str_bin(req.begin(), req.end());
+      c.enviar(req);
+
+      sleep_for(1s);
+
+      auto resp = c.receber();
+      cout << "Protocolo " << c.protocolo_tls() << "\n"
+           << "Cifra " << c.cifra() << "\n"
+           << "< Dados recebidos (" << resp.size() << " bytes):\n";
+      printa_str_bin(resp.begin(), resp.end());
+    }
+
+    {
+      tls_socket c("api.sologenic.org", 443);
+
+      string_view req("GET / HTTP/1.1\r\n"
+                      "Host: api.sologenic.org\r\n"
+                      "Connection: close\r\n"
+                      "\r\n");
+
+      cout << "> Enviar req (" << req.size() << " bytes):" << endl;
+      printa_str_bin(req.begin(), req.end());
+      c.enviar(req);
+
+      sleep_for(1s);
+
+      auto resp = c.receber();
+      cout << "Protocolo " << c.protocolo_tls() << "\n"
+           << "Cifra " << c.cifra() << "\n"
+           << "< Dados recebidos (" << resp.size() << " bytes):\n";
+      printa_str_bin(resp.begin(), resp.end());
+    }
+
+    /*
+    {
+      tls_socket c("127.0.0.1", 4433);
+
+      string_view req("GET / HTTP/1.1\r\n"
+                      "Host: localhost\r\n"
+                      "Connection: close\r\n"
+                      "\r\n");
+
+      cout << "> Enviar req (" << req.size() << " bytes):" << endl;
+      printa_str_bin(req.begin(), req.end());
+      c.enviar(req);
+
+      sleep_for(1s);
+
+      auto resp = c.receber();
+      cout << "Protocolo " << c.protocolo_tls() << "\n"
+           << "Cifra " << c.cifra() << "\n"
+           << "< Dados recebidos (" << resp.size() << " bytes):\n";
+      printa_str_bin(resp.begin(), resp.end());
+    }
+    */
 
 } catch (const exception& e) {
     cout << "Exceção lançada: " << e.what() << '\n';

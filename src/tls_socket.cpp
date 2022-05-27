@@ -156,16 +156,27 @@ namespace nes::net {
       else if (ret == -1)
       {
         auto errcode = SSL_get_error(m_sock_ssl, -1);
+
         switch(errcode)
         {
           case SSL_ERROR_WANT_READ:
           case SSL_ERROR_WANT_WRITE:
             break;
           default:
-            throw runtime_error {
-              "Erro durante o handshake!\n"
-              "Cód.: " + to_string(errcode) + "-" + ERR_error_string(errcode, NULL)
-            };
+          {
+            vector<unsigned long> erros;
+            string msg = "Erro durante o handshake!\n";
+
+            // Extrai todos os erros
+            while ((errcode = ERR_get_error()) != 0)
+              erros.push_back(errcode);
+
+            // Monta a mensagem
+            for (const auto erro : erros)
+              msg += to_string(erro) + " " + ERR_error_string(erro, NULL);
+
+            throw runtime_error { msg };
+          }
         }
         intervalo += intervalo_passo;
         if (intervalo >= intervalo_max)
@@ -197,6 +208,14 @@ namespace nes::net {
   {
     if (m_sock_ssl)
       return string { SSL_get_cipher(m_sock_ssl) };
+    else
+      return string {};
+  }
+
+  string tls_socket::protocolo_tls() const
+  {
+    if (m_sock_ssl)
+      return string { SSL_get_version(m_sock_ssl) };
     else
       return string {};
   }
@@ -241,9 +260,7 @@ namespace nes::net {
 
   void tls_socket::enviar(string_view dados_str)
   {
-    auto b = reinterpret_cast<const byte*>(&*dados_str.begin());
-    auto e = reinterpret_cast<const byte*>(&*dados_str.end());
-    this->enviar(span<const byte> { b, e });
+    this->enviar(as_bytes(span { dados_str.begin(), dados_str.end() }));
   }
 
   vector<byte> tls_socket::receber()

@@ -45,6 +45,7 @@ namespace nes::net {
     bool conectado() const;
 
     std::string cifra() const;
+    std::string protocolo_tls() const;
 
     // Funções de E/S
     void enviar(std::span<const std::byte>);
