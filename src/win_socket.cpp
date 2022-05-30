@@ -224,14 +224,25 @@ namespace nes::so {
       // Cria o novo socket recebido
       win_socket ret;
       ret.m_winsocket = socket_cli;
-      //ret.m_end_ipv4 = inet_ntoa(cliente_info.sin_addr);
-      // xxx.xxx.xxx.xxx
-      ret.m_end_ipv4.resize(15);
-      if (!inet_ntop(AF_INET, reinterpret_cast<const void*>(&cliente_info.sin_addr),
-                     ret.m_end_ipv4.data(), ret.m_end_ipv4.size()))
-        throw runtime_error { "inet_ntop falhou" };;
 
-      ret.m_porta_ipv4 = ntohs(cliente_info.sin_port);
+      // xxx.xxx.xxx.xxx:yyyy
+      wstring ip_porta(32, wchar_t {});
+      DWORD size_str_ip = static_cast<DWORD>(ip_porta.size());
+      if (WSAAddressToStringW(reinterpret_cast<sockaddr*>(&cliente_info), size, nullptr,
+                              ip_porta.data(), &size_str_ip))
+        throw runtime_error { "WSAAddressToStringW falhou" };
+
+      ip_porta.resize(size_str_ip);
+      ret.m_end_ipv4.resize(size_str_ip);
+      for (const auto ch : ip_porta)
+        ret.m_end_ipv4.push_back(static_cast<char>(ch));
+
+      auto pos = ret.m_end_ipv4.find(':');
+      if (pos == string::npos)
+        throw runtime_error { "WSAAddressToStringA não identificou porta" };
+
+      ret.m_porta_ipv4 = stoi(ret.m_end_ipv4.substr(pos + 1));
+      ret.m_end_ipv4.erase(pos);
 
       // Seta como não bloqueia
       u_long iModo = 1;
