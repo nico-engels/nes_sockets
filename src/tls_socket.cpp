@@ -12,6 +12,7 @@
 using namespace std;
 using namespace std::chrono;
 using namespace std::chrono_literals;
+using namespace nes;
 
 namespace nes::net {
 
@@ -73,7 +74,6 @@ namespace nes::net {
   }
 
   tls_socket::tls_socket(string ip, unsigned porta)
-    : m_sock { ip, porta }
   {
     // Inicialização da lib
     // Apenas uma vez na execução do programa
@@ -82,20 +82,9 @@ namespace nes::net {
     // Contexto
     ctxssl_ini ini;
 
-    // Manipulador da conexão
-    SSL *sock_ssl = SSL_new(openssl_ctx());
-    if (!sock_ssl)
-      throw runtime_error { "Não foi possível alocar a conexão OpenSSL para o cliente!" };
-    sockssl_rai ssock_ssl(sock_ssl);
+    this->conectar(ip, porta);
 
-    // Linkar com o socket nativo
-    int ret = SSL_set_fd(ssock_ssl.handle(), static_cast<int>(m_sock.native_handle()));
-    if (ret != 1)
-      throw runtime_error { "Não foi possível configurar a conexão OpenSSL com o socket nativo!" };
-
-    // OK
     ini.iniciou();
-    m_sock_ssl = ssock_ssl.release();
   }
 
   tls_socket::tls_socket(tls_socket&& outro)
@@ -120,17 +109,51 @@ namespace nes::net {
 
   tls_socket::~tls_socket()
   {
-    // Manipulador da conexão
-    if (m_sock_ssl)
-      SSL_free(m_sock_ssl);
+    this->desconectar();
 
     // Contexto
     openssl_ctx_free();
   }
 
+  void tls_socket::conectar(string endereco, unsigned porta)
+  {
+    if (m_sock_ssl)
+      throw runtime_error { "O socket-tls já está configurado!" };
+
+    // Conecta primeiro no socket
+    m_sock.conectar(move(endereco), porta);
+
+    // Manipulador da conexão
+    SSL *sock_ssl = SSL_new(openssl_ctx());
+    if (!sock_ssl)
+      throw runtime_error { "Não foi possível alocar a conexão OpenSSL para o cliente!" };
+    sockssl_rai ssock_ssl(sock_ssl);
+
+    // Linkar com o socket nativo
+    int ret = SSL_set_fd(ssock_ssl.handle(), static_cast<int>(m_sock.native_handle()));
+    if (ret != 1)
+      throw runtime_error { "Não foi possível configurar a conexão OpenSSL com o socket nativo!" };
+
+    // OK
+    m_sock_ssl = ssock_ssl.release();
+  }
+
+  void tls_socket::desconectar()
+  {
+    // Manipulador da conexão
+    if (m_sock_ssl)
+    {
+      SSL_free(m_sock_ssl);
+      m_sock_ssl = nullptr;
+
+      m_sock.desconectar();
+      m_handshake = estado_handshake::conectar;
+    }
+  }
+
   void tls_socket::handshake()
   {
-    constexpr milliseconds intervalo_max = 1000ms;
+    constexpr milliseconds intervalo_max = 5000ms;
     constexpr milliseconds intervalo_passo = 50ms;
     milliseconds intervalo = 0ms;
 
@@ -156,7 +179,6 @@ namespace nes::net {
       else if (ret == -1)
       {
         auto errcode = SSL_get_error(m_sock_ssl, -1);
-
         switch(errcode)
         {
           case SSL_ERROR_WANT_READ:
@@ -168,7 +190,7 @@ namespace nes::net {
             string msg = "Erro durante o handshake!\n";
 
             // Extrai todos os erros
-            while ((errcode = ERR_get_error()) != 0)
+            while ((errcode = static_cast<decltype(errcode)>(ERR_get_error())) != 0)
               erros.push_back(errcode);
 
             // Monta a mensagem
@@ -180,13 +202,21 @@ namespace nes::net {
         }
         intervalo += intervalo_passo;
         if (intervalo >= intervalo_max)
-          throw runtime_error { "Timeout no envio de dados!" };
+          throw runtime_error { "Timeout no envio de dados de handshake!" };
 
         this_thread::sleep_for(intervalo_passo);
       }
     } while (ret != 1);
 
     m_handshake = estado_handshake::ok;
+  }
+
+  void tls_socket::tls_ext_host_name(string host)
+  {
+    if (m_sock_ssl)
+      // Essa função é uma macro e ocorre um warning devido a um (void*) usado o corpo da macro
+      // SSL_set_tlsext_host_name(m_sock_ssl, host.data());
+      SSL_ctrl(m_sock_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, host.data());
   }
 
   const string& tls_socket::end_ipv4() const
@@ -201,7 +231,7 @@ namespace nes::net {
 
   bool tls_socket::conectado() const
   {
-    return m_sock.conectado();
+    return m_sock_ssl != nullptr;
   }
 
   string tls_socket::cifra() const
@@ -296,14 +326,14 @@ namespace nes::net {
           {
             // Pode ser socket fechado normalmente, lança a exceção dentro do receber()
             if (coderr == SSL_ERROR_SYSCALL && ERR_get_error() == 0)
-              m_sock.receber();
+              static_cast<void>(m_sock.receber());
 
             throw runtime_error { "SSL_read:SSL_get_error! Cód.: " + to_string(coderr) };
           }
         }
         tempo += cfg::net::intervalo_passo;
         if (tempo >= cfg::net::timeout)
-          throw runtime_error { "Timeout no envio de dados!" };
+          throw runtime_error { "Timeout no recebimento de dados!" };
 
         this_thread::sleep_for(cfg::net::intervalo_passo);
       }
@@ -444,6 +474,7 @@ namespace nes::net {
       SSL_CTX_free(openssl_ctxe);
   }
 
+  // Instanciações do template, devem vir ao final para funcionar no gcc e clang
   // Instância as funções utilizadas
   template pair<vector<byte>, ptrdiff_t> tls_socket::receber_ate_delim(span<const byte>, seconds, size_t);
   template pair<vector<byte>, ptrdiff_t> tls_socket::receber_ate_delim(span<const byte>, milliseconds, size_t);
@@ -451,6 +482,5 @@ namespace nes::net {
   template vector<byte> tls_socket::receber_ate_tam(size_t, milliseconds);
   template vector<byte> tls_socket::receber_ao_menos(size_t, seconds);
   template void tls_socket::receber_resto(vector<byte>&, size_t, seconds);
-
 
 }

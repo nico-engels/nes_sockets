@@ -39,6 +39,14 @@ namespace nes::net {
     const tls_socket& operator=(const tls_socket&) const = delete;
     tls_socket& operator=(tls_socket&&);
 
+    // Conexão no endereço especificado
+    void conectar(std::string, unsigned);
+    void desconectar();
+
+    // Extenções do TLS
+    // Para casos de servidores que hospedam vários sites, informa o virtual host
+    void tls_ext_host_name(std::string);
+
     // Acesso a informações
     const std::string& end_ipv4() const;
     unsigned porta_ipv4() const;

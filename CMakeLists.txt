@@ -15,7 +15,7 @@ cmake -G "Visual Studio 17 2022" ..
 cmake --build .
 
 -- PI
-cmake -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc-10 -DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++-10
+cmake -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc-11 -DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++-11
 ]]
 cmake_minimum_required(VERSION 3.16)
 project(nes_sockets VERSION 5)

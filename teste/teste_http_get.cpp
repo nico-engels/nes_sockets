@@ -129,10 +129,14 @@ try {
     }
 
     {
-      tls_socket c("api.sologenic.org", 443);
+      // curl --http1.1 -4 -k -v https://sologenic.org
+      tls_socket c("sologenic.org", 443);
+
+      // Virtual host
+      c.tls_ext_host_name("sologenic.org");
 
       string_view req("GET / HTTP/1.1\r\n"
-                      "Host: api.sologenic.org\r\n"
+                      "Host: sologenic.org\r\n"
                       "Connection: close\r\n"
                       "\r\n");
 
@@ -173,9 +177,9 @@ try {
     */
 
 } catch (const exception& e) {
-    cout << "Exceção lançada: " << e.what() << '\n';
+    cout << "ExceÃ§Ã£o lanÃ§ada: " << e.what() << '\n';
 } catch (...) {
-    cout << "Exceção lançada\n";
+    cout << "ExceÃ§Ã£o lanÃ§ada\n";
 }
 
 template <class I>
