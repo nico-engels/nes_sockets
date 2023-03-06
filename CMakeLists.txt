@@ -32,6 +32,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
 
 #~~ Biblioteca nes_sockets
 set(nes_sck_srcs
+  include/byte_op.h         src/byte_op.cpp
   include/cfg.h
   include/net_exc.h
   include/socket.h          src/socket.cpp
