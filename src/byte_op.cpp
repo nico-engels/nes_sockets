@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <iterator>
 #include <stdexcept>
 using namespace std;
@@ -22,7 +23,7 @@ namespace nes {
 
   string para_base64(string_view dados, bool nl /*= true*/, bool pad /*= true*/)
   {
-    return para_base64(as_bytes(span { dados.begin(), dados.end() }), nl, pad);
+    return para_base64(as_bytes(span { dados }), nl, pad);
   }
 
   string para_base64(span<const byte> dados, bool nl /*= true*/, bool pad /*= true*/)
@@ -315,7 +316,7 @@ namespace nes {
   span<const byte> strv_to_bin(string_view str)
   {
     // Converte de uma string para visão binária
-    return { as_bytes(span { str.begin(), str.end() })};
+    return { as_bytes(span { str })};
   }
 
 }
