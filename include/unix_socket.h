@@ -11,51 +11,49 @@ namespace nes::so {
 
   class unix_socket final
   {
-    // Manipulador do Socket Unix
+    // BSD socket handle
     int m_unix_sd;
 
-    // Informações de endereço IPv4
-    std::string m_end_ipv4 { "0.0.0.0" };
-    unsigned m_porta_ipv4 { 0 };
+    // IPv4 Data
+    std::string m_ipv4_address { "0.0.0.0" };
+    unsigned m_ipv4_port { 0 };
 
   public:
     unix_socket();
     ~unix_socket();
-
-    // Movimento
     unix_socket(unix_socket&&) noexcept;
     unix_socket& operator=(unix_socket&&) noexcept;
 
-    // Sem cópias
+    // No copy (unique sock handle)
     unix_socket(const unix_socket&) = delete;
     unix_socket& operator=(const unix_socket&) = delete;
 
-    // Acesso
-    const std::string& end_ipv4() const;
-    unsigned porta_ipv4() const;
+    // Access
+    const std::string& ipv4_address() const;
+    unsigned ipv4_port() const;
 
     using native_handle_type = int;
     native_handle_type native_handle() const;
 
-    // Servidor
-    // Começa a ouvir
-    void escutar(unsigned);
+    // Server API
+    // Put the sock on non-block listening
+    void listen(unsigned);
 
-    // Funções de Status do Socket
-    bool conectado() const;
-    bool escutando() const;
-    bool ha_cliente();
+    // Status
+    bool is_listening() const;
+    bool has_client();
 
-    // Aceita a conexão
-    std::optional<unix_socket> aceitar();
+    std::optional<unix_socket> accept();
 
-    // Cliente - Conecta no endereço IPv4
-    void conectar(std::string, unsigned);
-    void desconectar();
+    // Client API
+    // Connection
+    void connect(std::string, unsigned);
+    void disconnect();
+    bool is_connected() const;
 
-    // E/S
-    void enviar(std::span<const std::byte>);
-    std::vector<std::byte> receber();
+    // I/O
+    void send(std::span<const std::byte>);
+    std::vector<std::byte> receive();
   };
 
 }

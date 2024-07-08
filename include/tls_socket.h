@@ -16,19 +16,20 @@ namespace nes::net {
 
   class tls_socket final
   {
-    // Socket e a conexão OpenSSL
+    // Socket and OpenSSL handler
     socket m_sock;
     SSL *m_sock_ssl { nullptr };
 
-    // Handshake estado e função
-    enum class estado_handshake { conectar, aceitar, ok };
-    estado_handshake m_handshake { estado_handshake::conectar };
+    // TLS Handshake state
+    enum class handshake_state { connect, accept, ok };
+    handshake_state m_handshake { handshake_state::connect };
     void handshake();
 
   public:
-    // Construtor
     tls_socket();
     tls_socket(SSL*, socket);
+
+    // Constructor (Host, port)
     tls_socket(std::string, unsigned);
 
     ~tls_socket();
@@ -39,43 +40,49 @@ namespace nes::net {
     const tls_socket& operator=(const tls_socket&) const = delete;
     tls_socket& operator=(tls_socket&&);
 
-    // Conexão no endereço especificado
-    void conectar(std::string, unsigned);
-    void desconectar();
+    // Connection (Host, port)
+    void connect(std::string, unsigned);
+    void disconnect();
 
-    // Extenções do TLS
-    // Para casos de servidores que hospedam vários sites, informa o virtual host
+    // TLS Extensions
+    // Virtual host (same host many sites)
     void tls_ext_host_name(std::string);
 
-    // Acesso a informações
-    const std::string& end_ipv4() const;
-    unsigned porta_ipv4() const;
-    bool conectado() const;
+    // IPv4 Connection Data
+    const std::string& ipv4_address() const;
+    unsigned ipv4_port() const;
+    bool is_connected() const;
 
-    std::string cifra() const;
-    std::string protocolo_tls() const;
+    std::string cipher() const;
+    std::string tls_protocol() const;
 
-    // Funções de E/S
-    void enviar(std::span<const std::byte>);
-    void enviar(std::string_view);
-    std::vector<std::byte> receber();
+    // I/O basic functions (binary or binary char)
+    void send(std::span<const std::byte>);
+    void send(std::string_view);
+    [[nodiscard]] std::vector<std::byte> receive();
 
-    // Utilitários de E/S
+    // I/O basic utilities
+    // Where exists the time_expire and/or max_size are used as maximum threasholds
+    // Spin receiving data until finds the delim arg, return the data and pos of delim in data
     template <class R, class P = std::ratio<1>>
-    std::pair<std::vector<std::byte>, std::ptrdiff_t>
-    receber_ate_delim(std::span<const std::byte>, std::chrono::duration<R, P>, std::size_t);
+    [[nodiscard]] std::pair<std::vector<std::byte>, std::size_t>
+    receive_until_delimiter(std::span<const std::byte> delim, std::chrono::duration<R, P> time_expire,
+      std::size_t max_size);
 
+    // Read data until receive the exact_size number of bytes
     template <class R, class P = std::ratio<1>>
-    std::vector<std::byte> receber_ate_tam(std::size_t, std::chrono::duration<R, P>);
+    [[nodiscard]] std::vector<std::byte> receive_until_size(std::size_t exact_size, std::chrono::duration<R, P> time_expire);
 
+    // Read data until receive the >= at_least_size bytes
     template <class R, class P = std::ratio<1>>
-    std::vector<std::byte> receber_ao_menos(std::size_t, std::chrono::duration<R, P>);
+    [[nodiscard]] std::vector<std::byte> receive_at_least(std::size_t at_least_size, std::chrono::duration<R, P> time_expire);
 
+    // Complete the data arg until the data.size() is equals arg total_size
     template <class R, class P>
-    void receber_resto(std::vector<std::byte>&, size_t, std::chrono::duration<R, P>);
+    void receive_remaining(std::vector<std::byte>& data, size_t total_size, std::chrono::duration<R, P> time_expire);
 
-    // Utilitário para realizar a conexão em uma única thread
-    friend void estabelecer_handshake(tls_socket&, tls_socket&);
+    // Make manual TLS handshake (auxiliary function same thread connection)
+    friend void same_thread_handshake(tls_socket&, tls_socket&);
   };
 
 }

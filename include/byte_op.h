@@ -12,22 +12,22 @@
 
 namespace nes {
 
-  // Conversor para base64 baseado na RFC 4648
-  std::string para_base64(std::span<const std::byte>, bool = true, bool = true);
-  std::string para_base64(std::string_view, bool = true, bool = true);
+  // Base64 Converter based on RFC 4648
+  std::string to_base64(std::span<const std::byte>, bool = true, bool = true);
+  std::string to_base64(std::string_view, bool = true, bool = true);
 
-  std::vector<std::byte> de_base64(std::string_view, bool = true);
+  std::vector<std::byte> base64_to(std::string_view, bool = true);
 
-  // Conversão de binário para tipos inteiros
+  // Binary Converter to integral types
   template <class T>
     requires std::is_integral_v<T>
-  std::array<std::byte, sizeof(T)> para_bin(const T&, std::endian = std::endian::native);
+  std::array<std::byte, sizeof(T)> to_bin_arr(const T&, std::endian = std::endian::native);
 
   template <class T>
     requires std::is_integral_v<T>
-  T bin_para(const std::array<std::byte, sizeof(T)>&, std::endian = std::endian::native);
+  T bin_arr_to(const std::array<std::byte, sizeof(T)>&, std::endian = std::endian::native);
 
-  // Transforma de byte para string
+  // Transform from byte to string
   std::string_view bin_to_strv(std::span<const std::byte>);
   std::string bin_to_str(std::span<const std::byte>);
   std::span<const std::byte> strv_to_bin(std::string_view);

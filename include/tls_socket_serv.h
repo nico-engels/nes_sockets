@@ -9,12 +9,12 @@ namespace nes::net {
 
   class tls_socket_serv final
   {
-    // Socket de escuta
+    // SO Native Socket Server
     socket_serv m_sock;
 
-    // Caminho das chaves pública e privada
-    std::string m_caminho_chave_pub;
-    std::string m_caminho_chave_priv;
+    // Public/Private Key Pair Path
+    std::string m_pubkey_path;
+    std::string m_privkey_path;
 
   public:
     tls_socket_serv();
@@ -23,29 +23,24 @@ namespace nes::net {
     tls_socket_serv(tls_socket_serv&&);
     tls_socket_serv& operator=(tls_socket_serv&&);
 
-    // Sem cópias
     tls_socket_serv(const tls_socket_serv&) = delete;
     const tls_socket_serv& operator=(const tls_socket_serv&) = delete;
 
     ~tls_socket_serv();
 
-    // Iniciar a escuta
-    void escutar(unsigned, std::string, std::string);
+    // Put the sock on non-block listening (Ipv4 Port, Public Key Path, Private Key Path)
+    void listen(unsigned, std::string, std::string);
 
-    // Acesso
-    unsigned porta_ipv4() const;
+    unsigned ipv4_port() const;
 
     const std::string& caminho_chave_pub() const;
     const std::string& caminho_chave_priv() const;
 
-    // Função de Status do Socket
-    bool escutando() const;
-    bool ha_cliente();
+    bool is_listening() const;
+    bool has_client();
 
-    // Aceitar conexão
-    std::optional<tls_socket> aceitar();
+    std::optional<tls_socket> accept();
   };
-
 }
 
 #endif

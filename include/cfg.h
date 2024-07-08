@@ -3,33 +3,28 @@
 
 #include <chrono>
 
-namespace nes {
+// General Enviroment Definitions
+namespace nes::cfg {
 
-  // Definições Gerais de Ambiente
-  struct cfg {
-    struct net {
-       // Esperas
-       static constexpr std::chrono::milliseconds intervalo_passo = std::chrono::milliseconds { 25 };
-       static constexpr std::chrono::milliseconds intervalo_max   = std::chrono::seconds { 1 };
+  namespace net {
+     // Waiting times
+     constexpr auto wait_io_step_min = std::chrono::milliseconds {  25 };
+     constexpr auto wait_io_step_max = std::chrono::milliseconds { 250 };
 
-       static constexpr std::chrono::milliseconds timeout         = std::chrono::seconds { 5 };
+     // Packet Size
+     constexpr auto packet_size = size_t { 8'192 };
 
-       // Tamanhos
-       static constexpr std::size_t bloco = 8'192;
+     // Retries
+     constexpr auto io_max_retry = size_t { 100 };
+  }
 
-       // Tentativas
-       static constexpr std::size_t tentativas_max = 1'200;
-    };
-    struct so {
-      // Indica qual OS será utilizado no sistema
-      #ifdef _WIN32
-      static constexpr auto is_windows = true;
-      #else
-      static constexpr auto is_windows = false;
-      #endif
-    };
-  };
-
+  namespace so {
+    #ifdef _WIN32
+    constexpr auto is_windows = true;
+    #else
+    constexpr auto is_windows = false;
+    #endif
+  }
 }
 
 #endif

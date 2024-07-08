@@ -7,8 +7,9 @@
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include "socket_util.h"
 #include "cfg.h"
+#include "nes_exc.h"
+#include "socket_util.h"
 using namespace std;
 using namespace std::chrono;
 using namespace std::chrono_literals;
@@ -16,166 +17,153 @@ using namespace nes;
 
 namespace nes::net {
 
-  // Controle inicialização/finalização da biblioteca
-  once_flag inicializa_lib;
-  void inicializa_OpenSSL();
+  // Init/Destroy flag
+  once_flag init_lib;
+  void initialize_OpenSSL();
 
-  // Inicialização/Finalização do contexto da biblioteca
   SSL_CTX *openssl_ctx();
   void openssl_ctx_free();
 
-  // Classes auxiliares
+  // Aux RAII temporary handle
   namespace {
-  class sockssl_rai final
-  {
-    SSL *m_sock_ssl { nullptr };
+    class sockssl_rai final
+    {
+      SSL *m_sock_ssl { nullptr };
 
-  public:
-    sockssl_rai(SSL* sock) : m_sock_ssl { sock } {};
-    ~sockssl_rai() { if (m_sock_ssl) SSL_free(m_sock_ssl); };
+    public:
+      sockssl_rai(SSL* sock) : m_sock_ssl { sock } {};
+      ~sockssl_rai() { if (m_sock_ssl) SSL_free(m_sock_ssl); };
 
-    sockssl_rai(const sockssl_rai&) = delete;
+      sockssl_rai(const sockssl_rai&) = delete;
 
-    SSL* handle() { return m_sock_ssl; };
-    SSL* release() { SSL *ret = m_sock_ssl; m_sock_ssl = nullptr; return ret; };
-  };
+      SSL* handle() { return m_sock_ssl; };
+      SSL* release() { SSL *ret = m_sock_ssl; m_sock_ssl = nullptr; return ret; };
+    };
 
-  class ctxssl_ini final
-  {
-    bool m_iniciou { false };
-  public:
-    // Inicialização única do contexto
-    ctxssl_ini() { openssl_ctx(); }
+    class ctxssl_ini final
+    {
+      bool m_is_init { false };
+    public:
+      ctxssl_ini() { openssl_ctx(); }
 
-    // Executa no construtor, se deu algum problema decrementa o contador e desaloca o contexto
-    ~ctxssl_ini() { if (!m_iniciou) openssl_ctx_free(); }
+      ~ctxssl_ini() { if (!m_is_init) openssl_ctx_free(); }
 
-    void iniciou() { m_iniciou = true; };
-  };
+      void set_initialized() { m_is_init = true; };
+    };
   }
 
   tls_socket::tls_socket()
   {
-    // Inicialização da lib
-    // Apenas uma vez na execução do programa
-    call_once(inicializa_lib, inicializa_OpenSSL);
+    call_once(init_lib, initialize_OpenSSL);
 
-    // Contexto
     openssl_ctx();
   }
 
   tls_socket::tls_socket(SSL* ssl, socket s)
     : m_sock { move(s) }
     , m_sock_ssl { ssl }
-    , m_handshake { estado_handshake::aceitar }
+    , m_handshake { handshake_state::accept }
   {
-    // Contexto
     openssl_ctx();
   }
 
-  tls_socket::tls_socket(string ip, unsigned porta)
+  tls_socket::tls_socket(string ip, unsigned port)
   {
-    // Inicialização da lib
-    // Apenas uma vez na execução do programa
-    call_once(inicializa_lib, inicializa_OpenSSL);
+    call_once(init_lib, initialize_OpenSSL);
 
-    // Contexto
     ctxssl_ini ini;
 
-    this->conectar(ip, porta);
+    this->connect(ip, port);
 
-    ini.iniciou();
+    ini.set_initialized();
   }
 
-  tls_socket::tls_socket(tls_socket&& outro)
-    : m_sock { move(outro.m_sock) }
-    , m_sock_ssl { outro.m_sock_ssl }
-    , m_handshake { outro.m_handshake }
+  tls_socket::tls_socket(tls_socket&& other)
+    : m_sock { move(other.m_sock) }
+    , m_sock_ssl { other.m_sock_ssl }
+    , m_handshake { other.m_handshake }
   {
-    // Contexto
     openssl_ctx();
 
-    outro.m_sock_ssl = nullptr;
+    other.m_sock_ssl = nullptr;
   }
 
-  tls_socket& tls_socket::operator=(tls_socket&& outro)
+  tls_socket& tls_socket::operator=(tls_socket&& other)
   {
-    swap(m_sock, outro.m_sock);
-    swap(m_sock_ssl, outro.m_sock_ssl);
-    swap(m_handshake, outro.m_handshake);
+    swap(m_sock, other.m_sock);
+    swap(m_sock_ssl, other.m_sock_ssl);
+    swap(m_handshake, other.m_handshake);
 
     return *this;
   }
 
   tls_socket::~tls_socket()
   {
-    this->desconectar();
+    this->disconnect();
 
-    // Contexto
     openssl_ctx_free();
   }
 
-  void tls_socket::conectar(string endereco, unsigned porta)
+  void tls_socket::connect(string addr, unsigned port)
   {
     if (m_sock_ssl)
-      throw runtime_error { "O socket-tls já está configurado!" };
+      throw nes_exc { "TLS-Socket already configured." };
 
-    // Conecta primeiro no socket
-    m_sock.conectar(move(endereco), porta);
+    // First create the native socket, the tls protocol is layered
+    socket s (move(addr), port);
 
-    // Manipulador da conexão
+    // OpenSSL hangler
     SSL *sock_ssl = SSL_new(openssl_ctx());
     if (!sock_ssl)
-      throw runtime_error { "Não foi possível alocar a conexão OpenSSL para o cliente!" };
+      throw nes_exc { "Not possible alocate the OpenSSL client context." };
     sockssl_rai ssock_ssl(sock_ssl);
 
-    // Linkar com o socket nativo
-    int ret = SSL_set_fd(ssock_ssl.handle(), static_cast<int>(m_sock.native_handle()));
+    // Bind SSL with the nes_socket
+    int ret = SSL_set_fd(ssock_ssl.handle(), static_cast<int>(s.native_handle()));
     if (ret != 1)
-      throw runtime_error { "Não foi possível configurar a conexão OpenSSL com o socket nativo!" };
+      throw nes_exc { "Can not bind the SSL handle with native socket." };
 
-    // OK
+    // All ok, can set the class
     m_sock_ssl = ssock_ssl.release();
+    m_sock = move(s);
   }
 
-  void tls_socket::desconectar()
+  void tls_socket::disconnect()
   {
-    // Manipulador da conexão
     if (m_sock_ssl)
     {
       SSL_free(m_sock_ssl);
       m_sock_ssl = nullptr;
 
-      m_sock.desconectar();
-      m_handshake = estado_handshake::conectar;
+      m_sock.disconnect();
+      m_handshake = handshake_state::connect;
     }
   }
 
   void tls_socket::handshake()
   {
-    constexpr milliseconds intervalo_max = 5000ms;
-    constexpr milliseconds intervalo_passo = 50ms;
-    milliseconds intervalo = 0ms;
+    milliseconds interval = cfg::net::wait_io_step_min;
+    size_t retry_count = 0;
 
-    // Realizar o Handshake
+    // Handshake process
     int ret = -1;
     do {
       switch (m_handshake)
       {
-        case estado_handshake::conectar:
+        case handshake_state::connect:
           ret = SSL_connect(m_sock_ssl);
           break;
 
-        case estado_handshake::aceitar:
+        case handshake_state::accept:
           ret = SSL_accept(m_sock_ssl);
           break;
 
-        case estado_handshake::ok:
-          throw runtime_error { "Handshake já realizado!" };
+        case handshake_state::ok:
+          throw nes_exc { "Handshake already over." };
       }
 
       if (ret == 0)
-        throw runtime_error { "Erro no handshake!" };
+        throw nes_exc { "Handshake error." };
       else if (ret == -1)
       {
         auto errcode = SSL_get_error(m_sock_ssl, -1);
@@ -183,58 +171,60 @@ namespace nes::net {
         {
           case SSL_ERROR_WANT_READ:
           case SSL_ERROR_WANT_WRITE:
+          {
+            this_thread::sleep_for(interval);
+
+            if (retry_count >= cfg::net::io_max_retry)
+              throw nes_exc { "Handshake timeout." };
+
+            interval = calculate_interval_retry(++retry_count);
             break;
+          }
           default:
           {
-            vector<unsigned long> erros;
-            string msg = "Erro durante o handshake!\n";
+            vector<decltype(errcode)> erros;
+            string msg = "Error while making the handshake!\n";
+            erros.push_back(errcode);
 
-            // Extrai todos os erros
+            // Collect all the errors and create the error message
             while ((errcode = static_cast<decltype(errcode)>(ERR_get_error())) != 0)
               erros.push_back(errcode);
 
-            // Monta a mensagem
             for (const auto erro : erros)
-              msg += to_string(erro) + " " + ERR_error_string(erro, NULL);
+              msg += to_string(erro) + " " + ERR_error_string(static_cast<unsigned long>(erro), NULL);
 
-            throw runtime_error { msg };
+            throw nes_exc { msg };
           }
         }
-        intervalo += intervalo_passo;
-        if (intervalo >= intervalo_max)
-          throw runtime_error { "Timeout no envio de dados de handshake!" };
-
-        this_thread::sleep_for(intervalo_passo);
       }
     } while (ret != 1);
 
-    m_handshake = estado_handshake::ok;
+    m_handshake = handshake_state::ok;
   }
 
   void tls_socket::tls_ext_host_name(string host)
   {
+    // Special TLS Protocol extensions
     if (m_sock_ssl)
-      // Essa função é uma macro e ocorre um warning devido a um (void*) usado o corpo da macro
-      // SSL_set_tlsext_host_name(m_sock_ssl, host.data());
       SSL_ctrl(m_sock_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, host.data());
   }
 
-  const string& tls_socket::end_ipv4() const
+  const string& tls_socket::ipv4_address() const
   {
-    return m_sock.end_ipv4();
+    return m_sock.ipv4_address();
   }
 
-  unsigned tls_socket::porta_ipv4() const
+  unsigned tls_socket::ipv4_port() const
   {
-    return m_sock.porta_ipv4();
+    return m_sock.ipv4_port();
   }
 
-  bool tls_socket::conectado() const
+  bool tls_socket::is_connected() const
   {
     return m_sock_ssl != nullptr;
   }
 
-  string tls_socket::cifra() const
+  string tls_socket::cipher() const
   {
     if (m_sock_ssl)
       return string { SSL_get_cipher(m_sock_ssl) };
@@ -242,7 +232,7 @@ namespace nes::net {
       return string {};
   }
 
-  string tls_socket::protocolo_tls() const
+  string tls_socket::tls_protocol() const
   {
     if (m_sock_ssl)
       return string { SSL_get_version(m_sock_ssl) };
@@ -250,23 +240,23 @@ namespace nes::net {
       return string {};
   }
 
-  void tls_socket::enviar(span<const byte> dados)
+  void tls_socket::send(span<const byte> data_span)
   {
-    // Validação se está conectado
-    if (!m_sock.conectado())
-      throw runtime_error { "O socket TLS precisa estar conectado para enviar dados!" };
+    if (!m_sock.is_connected())
+      throw nes_exc { "The TLS socket is not connected." };
 
-    if (m_handshake != estado_handshake::ok)
+    if (m_handshake != handshake_state::ok)
       this->handshake();
 
-    milliseconds tempo = 0ms;
+    milliseconds interval = cfg::net::wait_io_step_min;
+    size_t retry_count = 0;
     int ret;
     do {
-      ret = SSL_write(m_sock_ssl, dados.data(), static_cast<int>(dados.size()));
+      ret = SSL_write(m_sock_ssl, data_span.data(), static_cast<int>(data_span.size()));
       if (ret > 0)
       {
-        if (static_cast<size_t>(ret) != dados.size())
-          throw runtime_error { "Não conseguiu enviar todos os dados!" };
+        if (static_cast<size_t>(ret) != data_span.size())
+          throw nes_exc { "Can not send all the data." };
       }
       else
       {
@@ -275,48 +265,47 @@ namespace nes::net {
         {
           case SSL_ERROR_WANT_READ:
           case SSL_ERROR_WANT_WRITE:
-            break;
-          default:
-            throw runtime_error { "Erro no envio dos dados! Cód.: " + to_string(coderr) };
-        }
-        tempo += cfg::net::intervalo_passo;
-        if (tempo >= cfg::net::timeout)
-          throw runtime_error { "Timeout no envio de dados!" };
+          {
+            this_thread::sleep_for(interval);
 
-        this_thread::sleep_for(cfg::net::intervalo_passo);
+            if (retry_count >= cfg::net::io_max_retry)
+              throw nes_exc { "Timeout sending data." };
+
+            interval = calculate_interval_retry(++retry_count);
+
+            break;
+          }
+          default:
+            throw nes_exc { "Error sending data! Cod.: {}", coderr };
+        }
       }
     } while (ret <= 0);
   }
 
-  void tls_socket::enviar(string_view dados_str)
+  void tls_socket::send(string_view data_str)
   {
-    this->enviar(as_bytes(span { dados_str.begin(), dados_str.end() }));
+    this->send(as_bytes(span { data_str.begin(), data_str.end() }));
   }
 
-  vector<byte> tls_socket::receber()
+  vector<byte> tls_socket::receive()
   {
-    // Validação
-    if (!m_sock.conectado())
-      throw runtime_error { "Socket TLS não conectado para receber dados!" };
+    if (!m_sock.is_connected())
+      throw nes_exc { "The TLS socket is not connected." };
 
-    if (m_handshake != estado_handshake::ok)
+    if (m_handshake != handshake_state::ok)
       this->handshake();
 
-    vector<byte> dados;
-    vector<byte> buffer(cfg::net::bloco, byte {});
+    array<byte, cfg::net::packet_size> packet_buffer;
+    vector<byte> ret;
 
-    milliseconds tempo = 0ms;
-    int ret;
-    do {
-      ret = SSL_read(m_sock_ssl, buffer.data(), static_cast<int>(buffer.size()));
-      if (ret > 0)
-      {
-        buffer.resize(static_cast<size_t>(ret));
-        dados.insert(dados.end(), buffer.begin(), buffer.end());
-      }
+    while (true)
+    {
+      int res = SSL_read(m_sock_ssl, packet_buffer.data(), static_cast<int>(packet_buffer.size()));
+      if (res > 0)
+        ret.insert(ret.end(), packet_buffer.begin(), packet_buffer.begin() + static_cast<size_t>(res));
       else
       {
-        auto coderr = SSL_get_error(m_sock_ssl, ret);
+        auto coderr = SSL_get_error(m_sock_ssl, res);
         switch(coderr)
         {
           case SSL_ERROR_WANT_READ:
@@ -324,95 +313,90 @@ namespace nes::net {
             break;
           default:
           {
-            // Pode ser socket fechado normalmente, lança a exceção dentro do receber()
-            if (coderr == SSL_ERROR_SYSCALL && ERR_get_error() == 0)
-              static_cast<void>(m_sock.receber());
+            if (ret.size())
+              break;
 
-            throw runtime_error { "SSL_read:SSL_get_error! Cód.: " + to_string(coderr) };
+            // Check if the underlying socket has clossed normally
+            if (coderr == SSL_ERROR_SYSCALL && ERR_get_error() == 0)
+              static_cast<void>(m_sock.receive());
+
+            throw nes_exc { "Error receiving data! Cod.: {}", coderr };
           }
         }
-        tempo += cfg::net::intervalo_passo;
-        if (tempo >= cfg::net::timeout)
-          throw runtime_error { "Timeout no recebimento de dados!" };
-
-        this_thread::sleep_for(cfg::net::intervalo_passo);
+        break;
       }
-    } while (ret == cfg::net::bloco);
+    }
 
-    return dados;
+    return ret;
   }
 
   template <class R, class P>
-  pair<vector<byte>, ptrdiff_t>
-  tls_socket::receber_ate_delim(span<const byte> delim, duration<R, P> tempo_exp, size_t tam_max)
+  pair<vector<byte>, size_t>
+  tls_socket::receive_until_delimiter(span<const byte> delim, duration<R, P> time_expire, size_t max_size)
   {
-    using nes::net::receber_ate_delim;
-    return receber_ate_delim(*this, delim, tempo_exp, tam_max);
+    using nes::net::receive_until_delimiter;
+    return receive_until_delimiter(*this, delim, time_expire, max_size);
   }
 
   template <class R, class P>
-  vector<byte> tls_socket::receber_ate_tam(size_t tam, duration<R, P> tempo_exp)
+  vector<byte> tls_socket::receive_until_size(size_t exact_size, duration<R, P> time_expire)
   {
-    using nes::net::receber_ate_tam;
-    return receber_ate_tam(*this, tam, tempo_exp);
+    using nes::net::receive_until_size;
+    return receive_until_size(*this, exact_size, time_expire);
   }
 
   template <class R, class P>
-  vector<byte> tls_socket::receber_ao_menos(size_t tam, duration<R, P> tempo_exp)
+  vector<byte> tls_socket::receive_at_least(size_t at_least_size, duration<R, P> time_expire)
   {
-    using nes::net::receber_ao_menos;
-    return receber_ao_menos(*this, tam, tempo_exp);
+    using nes::net::receive_at_least;
+    return receive_at_least(*this, at_least_size, time_expire);
   }
 
   template <class R, class P>
-  void tls_socket::receber_resto(vector<byte>& dados, size_t tam, duration<R, P> tempo_exp)
+  void tls_socket::receive_remaining(vector<byte>& data, size_t total_size, duration<R, P> time_expire)
   {
-    using nes::net::receber_resto;
-    receber_resto(*this, dados, tam, tempo_exp);
+    using nes::net::receive_remaining;
+    receive_remaining(*this, data, total_size, time_expire);
   }
 
-  void estabelecer_handshake(tls_socket& a, tls_socket& b)
+  void same_thread_handshake(tls_socket& a, tls_socket& b)
   {
-    // Utiliza ponteiros para dar os papéis no handshake
+    // If connecting the server client and client in same thread need make manual TLS handshake
     tls_socket* p_serv { nullptr };
     tls_socket* p_cli { nullptr };
-    if (a.m_handshake == tls_socket::estado_handshake::conectar &&
-        b.m_handshake == tls_socket::estado_handshake::aceitar)
+    if (a.m_handshake == tls_socket::handshake_state::connect &&
+        b.m_handshake == tls_socket::handshake_state::accept)
     {
       p_serv = &b; p_cli = &a;
     }
-    else if (a.m_handshake == tls_socket::estado_handshake::aceitar &&
-             b.m_handshake == tls_socket::estado_handshake::conectar)
+    else if (a.m_handshake == tls_socket::handshake_state::accept &&
+             b.m_handshake == tls_socket::handshake_state::connect)
     {
       p_serv = &a; p_cli = &b;
     }
     else
-      throw runtime_error { "Sockets estão em estados não compatíveis para handshake!" };
+      throw nes_exc { "The state of sockets are incompatiple to perform the handshake." };
 
-    constexpr milliseconds intervalo_max = 1000ms;
-    constexpr milliseconds intervalo_passo = 50ms;
-    milliseconds intervalo = 0ms;
-
-    // Realizar o Handshake
+    // Make the handshake
     tls_socket* p_sock = p_serv;
     int ret = -1;
     do {
       switch (p_sock->m_handshake)
       {
-        case tls_socket::estado_handshake::conectar:
+        case tls_socket::handshake_state::connect:
           ret = SSL_connect(p_sock->m_sock_ssl);
           break;
 
-        case tls_socket::estado_handshake::aceitar:
+        case tls_socket::handshake_state::accept:
           ret = SSL_accept(p_sock->m_sock_ssl);
           break;
 
-        case tls_socket::estado_handshake::ok:
-          throw runtime_error { "Handshake já realizado!" };
+        case tls_socket::handshake_state::ok:
+          throw nes_exc { "Handshake already over." };
       }
 
       if (ret == 0)
-        throw runtime_error { "Erro no handshake!" };
+        throw nes_exc { "Handshake error." };
       else if (ret == -1)
       {
         auto errcode = SSL_get_error(p_sock->m_sock_ssl, -1);
@@ -429,23 +413,18 @@ namespace nes::net {
             break;
           }
           default:
-            throw runtime_error { "Erro durante o handshake! Cód.: " + to_string(errcode) };
+            throw nes_exc { "Error making the handshake. Cod.: " + to_string(errcode) };
         }
-        intervalo += intervalo_passo;
-        if (intervalo >= intervalo_max)
-          throw runtime_error { "Timeout no envio de dados!" };
-
-        this_thread::sleep_for(intervalo_passo);
       }
     } while (ret != 1);
 
-    p_cli->m_handshake = tls_socket::estado_handshake::ok;
-    p_serv->m_handshake = tls_socket::estado_handshake::ok;
+    p_cli->m_handshake = tls_socket::handshake_state::ok;
+    p_serv->m_handshake = tls_socket::handshake_state::ok;
   }
 
-  void inicializa_OpenSSL()
+  void initialize_OpenSSL()
   {
-    // Inicializa a biblioteca OpenSSL
+    // OpenSSL Init
     SSL_load_error_strings();
     SSL_library_init();
   }
@@ -461,7 +440,7 @@ namespace nes::net {
       if (!openssl_ctxe)
       {
         --openssl_ctx_contador;
-        throw runtime_error { "Não foi possível alocar o contexto OpenSSL para o cliente!" };
+        throw nes_exc { "Fail to alocate global OpenSSL context." };
       }
     }
 
@@ -474,13 +453,12 @@ namespace nes::net {
       SSL_CTX_free(openssl_ctxe);
   }
 
-  // Instanciações do template, devem vir ao final para funcionar no gcc e clang
-  // Instância as funções utilizadas
-  template pair<vector<byte>, ptrdiff_t> tls_socket::receber_ate_delim(span<const byte>, seconds, size_t);
-  template pair<vector<byte>, ptrdiff_t> tls_socket::receber_ate_delim(span<const byte>, milliseconds, size_t);
-  template vector<byte> tls_socket::receber_ate_tam(size_t, seconds);
-  template vector<byte> tls_socket::receber_ate_tam(size_t, milliseconds);
-  template vector<byte> tls_socket::receber_ao_menos(size_t, seconds);
-  template void tls_socket::receber_resto(vector<byte>&, size_t, seconds);
+  // Template instantiations (at end to work with gcc and clang)
+  template pair<vector<byte>, size_t> tls_socket::receive_until_delimiter(span<const byte>, seconds, size_t);
+  template pair<vector<byte>, size_t> tls_socket::receive_until_delimiter(span<const byte>, milliseconds, size_t);
+  template vector<byte> tls_socket::receive_until_size(size_t, seconds);
+  template vector<byte> tls_socket::receive_until_size(size_t, milliseconds);
+  template vector<byte> tls_socket::receive_at_least(size_t, seconds);
+  template void tls_socket::receive_remaining(vector<byte>&, size_t, seconds);
 
 }

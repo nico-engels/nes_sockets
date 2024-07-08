@@ -5,6 +5,7 @@
   v4 => 24/10/2021 ** Atualizado melhorias Poup
   v5 => 04/02/2022 ** Usar CMake como build
   v6 => 18/03/2022 ** Versionamento privado no Github
+  v7 => 06/07/2024 ** Versionamento público no Github
 
 nes_sockets: Biblioteca para uso de sockets (Win/Unix); Sendo versão compacta da usada pelo Poup.
 

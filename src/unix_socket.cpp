@@ -15,9 +15,10 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
-#include "net_exc.h"
-#include "socket_util.h"
 #include "cfg.h"
+#include "net_exc.h"
+#include "nes_exc.h"
+#include "socket_util.h"
 using namespace std;
 using namespace std::chrono_literals;
 using namespace nes::net;
@@ -25,55 +26,52 @@ using namespace nes;
 
 namespace nes::so {
 
-  constexpr int SOCKET_INVALIDO = -1;
-  constexpr int SOCKET_ERRO = -1;
+  constexpr int SOCKET_INVALID = -1;
+  constexpr int SOCKET_ERROR = -1;
 
   unix_socket::unix_socket()
-    : m_unix_sd { SOCKET_INVALIDO }
+    : m_unix_sd { SOCKET_INVALID }
   {
 
   }
 
   unix_socket::~unix_socket()
   {
-    // Fecha o socket se existente
-    if (m_unix_sd != SOCKET_INVALIDO)
+    // If valid cleanup
+    if (m_unix_sd != SOCKET_INVALID)
     {
-      // Termina as conexões
       shutdown(m_unix_sd, SHUT_RDWR);
-
-      // Libera os recursos do Socket
       close(m_unix_sd);
     }
   }
 
-  unix_socket::unix_socket(unix_socket&& outro) noexcept
-    : m_unix_sd { outro.m_unix_sd }
-    , m_end_ipv4 { move(outro.m_end_ipv4) }
-    , m_porta_ipv4 { outro.m_porta_ipv4 }
+  unix_socket::unix_socket(unix_socket&& other) noexcept
+    : m_unix_sd { other.m_unix_sd }
+    , m_ipv4_address { move(other.m_ipv4_address) }
+    , m_ipv4_port { other.m_ipv4_port }
   {
-    outro.m_unix_sd = SOCKET_INVALIDO;
+    other.m_unix_sd = SOCKET_INVALID;
   }
 
-  unix_socket& unix_socket::operator=(unix_socket&& outro) noexcept
+  unix_socket& unix_socket::operator=(unix_socket&& other) noexcept
   {
-    m_unix_sd = outro.m_unix_sd;
-    outro.m_unix_sd = SOCKET_INVALIDO;
+    m_unix_sd = other.m_unix_sd;
+    other.m_unix_sd = SOCKET_INVALID;
 
-    m_end_ipv4 = move(outro.m_end_ipv4);
-    m_porta_ipv4 = outro.m_porta_ipv4;
+    m_ipv4_address = move(other.m_ipv4_address);
+    m_ipv4_port = other.m_ipv4_port;
 
     return *this;
   }
 
-  const string& unix_socket::end_ipv4() const
+  const string& unix_socket::ipv4_address() const
   {
-    return m_end_ipv4;
+    return m_ipv4_address;
   }
 
-  unsigned unix_socket::porta_ipv4() const
+  unsigned unix_socket::ipv4_port() const
   {
-    return m_porta_ipv4;
+    return m_ipv4_port;
   }
 
   unix_socket::native_handle_type unix_socket::native_handle() const
@@ -81,66 +79,61 @@ namespace nes::so {
     return m_unix_sd;
   }
 
-  void unix_socket::escutar(unsigned porta)
+  void unix_socket::listen(unsigned port)
   {
-    if (m_unix_sd != SOCKET_INVALIDO)
-      throw runtime_error { "O socket já esta configurado." };
+    if (m_unix_sd != SOCKET_INVALID)
+      throw nes_exc { "Socket already configured." };
 
-    // Inicializa o SOCKET pela API
     unique_ptr<int, function<void(int*)>> sock_serv = {
       new int { socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) },
-      [](int* p) { if (*p != SOCKET_INVALIDO) { close(*p); } delete p; }
+      [](int* p) { if (*p != SOCKET_INVALID) { close(*p); } delete p; }
     };
 
-    // Checa se foi criado com sucesso
-    if (*sock_serv == SOCKET_INVALIDO)
-      throw runtime_error { "Não foi possível criar um socket pela API do Unix!" };
+    if (*sock_serv == SOCKET_INVALID)
+      throw nes_exc { "Error on create Socket in linux syscall." };
 
-    // Configuração para resolução do endereço
-    struct sockaddr_in end_res;
+    // Address Resolution
+    struct sockaddr_in addr_res;
 
-    end_res.sin_family = AF_INET;
-    end_res.sin_addr.s_addr = INADDR_ANY;
-    end_res.sin_port = htons(static_cast<short unsigned>(porta));
+    addr_res.sin_family = AF_INET;
+    addr_res.sin_addr.s_addr = INADDR_ANY;
+    addr_res.sin_port = htons(static_cast<short unsigned>(port));
 
-    // Liga o servidor ao endereço passando a estrutura
-    if (bind(*sock_serv, reinterpret_cast<struct sockaddr*>(&end_res), sizeof(end_res)) < 0)
-      throw runtime_error { "Escutar na porta " + to_string(porta) + ". Código do erro " + to_string(errno) +
-        ": '" + strerror(errno) + "'." };
+    if (bind(*sock_serv, reinterpret_cast<struct sockaddr*>(&addr_res), sizeof(addr_res)) < 0)
+      throw nes_exc { "Socket cannot bind IPV4 port {}. Error {}: '{}'.", port, errno, strerror(errno) };
 
-    // Define o socket servidor como assíncrono
-    int marcadores = fcntl(*sock_serv, F_GETFL, 0);
-    if (marcadores < 0 || fcntl(*sock_serv, F_SETFL, marcadores | O_NONBLOCK) != 0)
-      throw runtime_error { "Não foi possível indicar o socket como assíncrono!" };
+    // Non-blocking socket
+    int marks = fcntl(*sock_serv, F_GETFL, 0);
+    if (marks < 0 || fcntl(*sock_serv, F_SETFL, marks | O_NONBLOCK) != 0)
+      throw nes_exc { "Socket error setting a listening socket to non-blocking." };
 
-    // Chamada que configura o Socket para escutar pórem não o bloqueia
-    // SOMAXCONN = Máx de conexões na fila
-    if (listen(*sock_serv, SOMAXCONN) < 0)
-      throw runtime_error { "Não iniciou a porta " + to_string(porta) + "!" };
+    // Start listing, but not block
+    // SOMAXCONN = Maximun number of client in queue
+    if (::listen(*sock_serv, SOMAXCONN) < 0)
+      throw nes_exc { "Socket error listen on IPv4 port {}.", port };
 
-    // Tudo em riba pode alterar a classe
+    // All ok, can set the class
     m_unix_sd = *sock_serv.release();
-    m_end_ipv4 = "0.0.0.0";
-    m_porta_ipv4 = porta;
+    m_ipv4_address = "0.0.0.0";
+    m_ipv4_port = port;
   }
 
-  bool unix_socket::conectado() const
+  bool unix_socket::is_connected() const
   {
-    return m_unix_sd != SOCKET_INVALIDO && m_end_ipv4 != "0.0.0.0" && m_porta_ipv4 != 0;
+    return m_unix_sd != SOCKET_INVALID && m_ipv4_address != "0.0.0.0" && m_ipv4_port != 0;
   }
 
-  bool unix_socket::escutando() const
+  bool unix_socket::is_listening() const
   {
-    return m_unix_sd != SOCKET_INVALIDO && m_end_ipv4 == "0.0.0.0" && m_porta_ipv4 != 0;
+    return m_unix_sd != SOCKET_INVALID && m_ipv4_address == "0.0.0.0" && m_ipv4_port != 0;
   }
 
-  bool unix_socket::ha_cliente()
+  bool unix_socket::has_client()
   {
-    // Validações
-    if (!this->escutando())
+    if (!this->is_listening())
       return false;
 
-    // Checa se há algo para ler
+    // Init, uses the poll functionality
     pollfd fd_sock;
     fd_sock.fd = m_unix_sd;
     fd_sock.events = POLLIN;
@@ -148,196 +141,194 @@ namespace nes::so {
     if (poll(&fd_sock, 1, 0) <= 0)
      return false;
 
-    // Verifica o campo de retorno
     if (fd_sock.revents & POLLIN)
       return true;
 
     return false;
   }
 
-  optional<unix_socket> unix_socket::aceitar()
+  optional<unix_socket> unix_socket::accept()
   {
-    // Validações
-    if (!this->escutando())
-      throw runtime_error { "O socket não está inicializado para aceitar conexões!" };
+    if (!this->is_listening())
+      throw nes_exc { "Socket is not listing, cannot accept connection." };
 
-    sockaddr_in cliente_info {};
-    socklen_t size = sizeof(cliente_info);
+    sockaddr_in client_info {};
+    socklen_t size = sizeof(client_info);
 
-    // Tenta aceitar alguma conexão na fila
-    int socket_cli = accept(m_unix_sd, reinterpret_cast<sockaddr*>(&cliente_info), &size);
-    if (socket_cli == SOCKET_INVALIDO)
+    // Try to get some client
+    int socket_cli = ::accept(m_unix_sd, reinterpret_cast<sockaddr*>(&client_info), &size);
+    if (socket_cli == SOCKET_INVALID)
     {
-      // Como o socket não bloqueia verifica se tem não há conexão na fila
+      // Return nullopt only if there is no client
       if (errno == EWOULDBLOCK)
         return nullopt;
       else
-        throw runtime_error { "Não foi possível aceitar a conexão!" };
+        throw nes_exc { "Socket error accept." };
     }
     else
     {
-      // Cria o novo socket recebido
+      // New client received
       unix_socket ret;
 
-      // Dados do cliente
       ret.m_unix_sd = socket_cli;
-      ret.m_end_ipv4 = inet_ntoa(cliente_info.sin_addr);
-      ret.m_porta_ipv4 = ntohs(cliente_info.sin_port);
+      ret.m_ipv4_address = inet_ntoa(client_info.sin_addr);
+      ret.m_ipv4_port = ntohs(client_info.sin_port);
 
-      // Define o socket servidor como assíncrono
-      int marcadores = fcntl(socket_cli, F_GETFL, 0);
-      if (marcadores < 0 || fcntl(socket_cli, F_SETFL, marcadores | O_NONBLOCK) != 0)
-        throw runtime_error { "Não foi possível indicar o socket como assíncrono!" };
+      // Set as non blocking
+      int marks = fcntl(socket_cli, F_GETFL, 0);
+      if (marks < 0 || fcntl(socket_cli, F_SETFL, marks | O_NONBLOCK) != 0)
+        throw nes_exc { "Socket error setting a listening socket to non-blocking." };
 
       return { move(ret) };
     }
   }
 
-  void unix_socket::conectar(string endereco, unsigned porta)
+  void unix_socket::connect(string addr, unsigned port)
   {
-    if (m_unix_sd != SOCKET_INVALIDO)
-      throw runtime_error { "O socket já esta configurado." };
+    if (m_unix_sd != SOCKET_INVALID)
+      throw nes_exc { "Socket already configured." };
 
-    // Inicializa o SOCKET pela API
     unique_ptr<int, function<void(int*)>> socket_cli = {
       new int { socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) },
-      [](int* p) { if (*p != SOCKET_INVALIDO) { close(*p); } delete p; }
+      [](int* p) { if (*p != SOCKET_INVALID) { close(*p); } delete p; }
     };
 
-    // Checa se foi criado com sucesso
-    if (*socket_cli == SOCKET_INVALIDO)
-      throw runtime_error { "Não foi possível criar um socket pela API do Unix!" };
+    if (*socket_cli == SOCKET_INVALID)
+      throw nes_exc { "Error on create Socket in linux syscall." };
 
-    // Configuração para resolução do endereço
-    struct addrinfo end_res_cfg;
+    // Address Resolution
+    struct addrinfo addr_res_cfg;
 
-    memset(&end_res_cfg, 0, sizeof(end_res_cfg));
+    memset(&addr_res_cfg, 0, sizeof(addr_res_cfg));
 
-    end_res_cfg.ai_family = AF_INET;
-    end_res_cfg.ai_socktype = SOCK_STREAM;
-    end_res_cfg.ai_protocol = IPPROTO_TCP;
-    end_res_cfg.ai_flags = AI_PASSIVE;
+    addr_res_cfg.ai_family = AF_INET;
+    addr_res_cfg.ai_socktype = SOCK_STREAM;
+    addr_res_cfg.ai_protocol = IPPROTO_TCP;
+    addr_res_cfg.ai_flags = AI_PASSIVE;
 
-    // Resolução
-    struct addrinfo *end_res;
-    if (getaddrinfo(endereco.data(), to_string(porta).c_str(), &end_res_cfg, &end_res))
-      throw runtime_error { "Erro na resolução do getaddrinfo()!" };
+    struct addrinfo *addr_res;
+    if (getaddrinfo(addr.data(), to_string(port).c_str(), &addr_res_cfg, &addr_res))
+      throw nes_exc { "Address resolution error." };
 
-    // RAAI da estrutura do endereço
     unique_ptr<struct addrinfo, function<void(struct addrinfo*)>> endResolvidoPtr {
-      end_res,
+      addr_res,
       [](struct addrinfo* p) { freeaddrinfo(p); }
     };
 
-    // Liga o servidor ao endereço passando a estrutura
-    if (connect(*socket_cli, end_res->ai_addr, static_cast<socklen_t>(end_res->ai_addrlen)) != 0)
-      throw runtime_error { "Não no endereço '" + endereco + ":" + to_string(porta) + "' !" };
+    // Resolved IPv4
+    string ip;
+    ip.resize(INET_ADDRSTRLEN);
 
-    // Define o socket servidor como assíncrono
-    int marcadores = fcntl(*socket_cli, F_GETFL, 0);
-    if (marcadores < 0 || fcntl(*socket_cli, F_SETFL, marcadores | O_NONBLOCK) != 0)
-      throw runtime_error { "Não foi possível indicar o socket como assíncrono!" };
+    struct sockaddr_in *addr4 = reinterpret_cast<struct sockaddr_in*>(
+      reinterpret_cast<void*>(addr_res->ai_addr));
+    const char* res = inet_ntop(AF_INET, &addr4->sin_addr, ip.data(), INET_ADDRSTRLEN);
 
-    // Tudo em riba pode alterar a classe
+    if (!res)
+      throw nes_exc { "Adress IPv4 extraction error." };
+
+    ip.resize(strlen(res));
+
+    if (::connect(*socket_cli, addr_res->ai_addr, static_cast<socklen_t>(addr_res->ai_addrlen)) != 0)
+      throw nes_exc { "Socket error connecting at address '{}({}):{}'.", addr, ip, port };
+
+    // Non blocking socket
+    int marks = fcntl(*socket_cli, F_GETFL, 0);
+    if (marks < 0 || fcntl(*socket_cli, F_SETFL, marks | O_NONBLOCK) != 0)
+      throw nes_exc { "Socket error setting the socket to non-blocking." };
+
+    // All ok, can set the class
     m_unix_sd = *socket_cli.release();
-    m_end_ipv4 = move(endereco);
-    m_porta_ipv4 = porta;
+    m_ipv4_address = move(ip);
+    m_ipv4_port = port;
   }
 
-  void unix_socket::desconectar()
+  void unix_socket::disconnect()
   {
-    if (this->conectado())
+    if (this->is_connected())
     {
-      // Termina as conexões
       shutdown(m_unix_sd, SHUT_RDWR);
-
-      // Libera os recursos do Socket
       close(m_unix_sd);
 
-      m_unix_sd = SOCKET_INVALIDO;
-      m_end_ipv4 = "0.0.0.0";
-      m_porta_ipv4 = 0;
+      m_unix_sd = SOCKET_INVALID;
+      m_ipv4_address = "0.0.0.0";
+      m_ipv4_port = 0;
     }
   }
 
-  void unix_socket::enviar(span<const byte> dados)
+  void unix_socket::send(span<const byte> data_span)
   {
-    // Validação
-    if (!this->conectado())
-      throw runtime_error { "O socket precisa estar conectado para enviar dados!" };
+    if (!this->is_connected())
+      throw nes_exc { "Socket is not connected, cannot send data." };
 
-    if (dados.size() == 0)
+    if (data_span.size() == 0)
       return;
 
-    size_t tentativas = 0;
-    auto intervalo = cfg::net::intervalo_passo;
-    for (ssize_t i = 0;
-         i < static_cast<ssize_t>(dados.size());
-         i += min(static_cast<ssize_t>(dados.size()) - i, static_cast<ssize_t>(cfg::net::bloco))) {
-      ssize_t ret = send(m_unix_sd,
-                         reinterpret_cast<const char*>(dados.data() + i),
-                         min(dados.size() - static_cast<size_t>(i), cfg::net::bloco),
-                         0);
+    // Send the data in cfg::net::packet_size chunks
+    size_t retry_count = 0;
+    auto interval = cfg::net::wait_io_step_min;
+    while (data_span.size())
+    {
+      auto chunk_size = min(data_span.size(), cfg::net::packet_size);
+      auto chunk = data_span.first(chunk_size);
+
+      auto ret = ::send(m_unix_sd, reinterpret_cast<const char*>(chunk.data()), chunk.size(), 0);
       if (ret == -1)
       {
-        // Falta de espaço no buffer da uma segunda chance
-        if (tentativas < cfg::net::tentativas_max && errno == EWOULDBLOCK)
+        if (retry_count < cfg::net::io_max_retry && errno == EWOULDBLOCK)
         {
-          this_thread::sleep_for(intervalo);
-          tentativas++;
-          i -= cfg::net::bloco;
-
-          // Baseado nas tentativas calcula o próximo intervalo
-          intervalo = calc_intervalo_proporcional(tentativas);
+          // As get more tries increase the wait
+          this_thread::sleep_for(interval);
+          retry_count++;
+          interval = calculate_interval_retry(retry_count);
         }
         else
-          throw runtime_error { "Troca de dados no socket. Código erro: " + to_string(errno) + " - " + strerror(errno) };
+          throw nes_exc { "Error on socket send data. Error: {} - '{}'!", errno, strerror(errno) };
       }
       else
       {
-        if (ret < static_cast<ssize_t>(min(static_cast<ssize_t>(dados.size()) - i, static_cast<ssize_t>(cfg::net::bloco))))
-          i -= min(static_cast<ssize_t>(dados.size()) - i, static_cast<ssize_t>(cfg::net::bloco)) - ret;
-        tentativas = 0;
-        intervalo = cfg::net::intervalo_passo;
+        chunk_size = ret;
+        retry_count = 0;
+        interval = cfg::net::wait_io_step_min;
       }
+
+      // Shrink the span
+      data_span = data_span.last(data_span.size() - chunk_size);
     }
 
   }
 
-  vector<byte> unix_socket::receber()
+  vector<byte> unix_socket::receive()
   {
     // Validação
-    if (!this->conectado())
-      throw runtime_error { "Não conectado para receber dados!" };
+    if (!this->is_connected())
+      throw nes_exc { "Socket is not connected, cannot receive data." };
 
-    array<byte, cfg::net::bloco> dados;
+    array<byte, cfg::net::packet_size> packet_buffer;
     vector<byte> ret;
 
-    // Enquanto houver dados a receber ou a conexão estiver ativa
     while (true)
     {
-      auto qtde = recv(m_unix_sd, reinterpret_cast<void*>(dados.data()), dados.size(), 0);
+      auto qtde = recv(m_unix_sd, reinterpret_cast<void*>(packet_buffer.data()), packet_buffer.size(), 0);
 
-      // Recebe os dados do socket, não bloqueia
-      if (qtde == SOCKET_ERRO)
+      if (qtde == SOCKET_ERROR)
       {
-        // Sem dados a receber, mas com conexão ativa
+        // No data to receive, but the connection is active
         if (errno == EWOULDBLOCK)
           break;
         else
-          throw runtime_error { "Erro no recebimento! Código de erro: " + to_string(errno) + "!" };
+          throw nes_exc { "Error on socket data receive. Error: {}.", errno };
       }
       else if (qtde == 0)
       {
-        // Foi fechado o socket, se possui dados retorna
+        // Closed socket, if there is data breaks
         if (ret.size() > 0)
           break;
 
-        throw socket_desconectado { "Socket foi fechado normalmente!" };
+        throw socket_disconnected { "Socket closed normally." };
       }
 
-      // Vai guardando os dados recebidos na variável
-      ret.insert(ret.end(), dados.begin(), dados.begin() + qtde);
+      // Collect the data
+      ret.insert(ret.end(), packet_buffer.begin(), packet_buffer.begin() + qtde);
     }
 
     return ret;

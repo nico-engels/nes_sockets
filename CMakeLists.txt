@@ -1,22 +1,5 @@
 #~~~ nes_sockets - Nicolas Engels
 
-#[[
-cd build
-
--- Windows Mingw64
-set PATH=%PATH%;C:\msys64\mingw64\bin\
-cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug ..
-cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release ..
-cmake --build .
-
--- Windows MSVC++
-set PATH=%PATH%;"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\"
-cmake -G "Visual Studio 17 2022" ..
-cmake --build .
-
--- PI
-cmake -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc-11 -DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++-11
-]]
 cmake_minimum_required(VERSION 3.16)
 project(nes_sockets VERSION 5)
 
@@ -30,7 +13,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
 
-#~~ Biblioteca nes_sockets
+#~~ nes_sockets Library
 set(nes_sck_srcs
   include/byte_op.h         src/byte_op.cpp
   include/cfg.h
@@ -61,15 +44,9 @@ if (WIN32)
   target_link_libraries(nes_sockets PUBLIC wsock32 ws2_32)
 endif ()
 
-#~~ Executáveis de testes
-# Teste HTTP GET
-add_executable(teste_http_get EXCLUDE_FROM_ALL teste/teste_http_get.cpp)
+#~~ Examples
+# Test HTTP GET
+add_executable(test_http_get EXCLUDE_FROM_ALL examples/test_http_get.cpp)
 
-set_property(TARGET teste_http_get PROPERTY CXX_STANDARD 20)
-target_link_libraries(teste_http_get nes_sockets)
-
-# Teste Mail
-add_executable(teste_mail EXCLUDE_FROM_ALL teste/teste_mail.cpp)
-
-set_property(TARGET teste_mail PROPERTY CXX_STANDARD 20)
-target_link_libraries(teste_mail nes_sockets)
+set_property(TARGET test_http_get PROPERTY CXX_STANDARD 20)
+target_link_libraries(test_http_get nes_sockets)

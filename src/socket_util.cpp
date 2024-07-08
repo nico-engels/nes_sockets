@@ -1,5 +1,6 @@
 #include "socket_util.h"
 
+#include <algorithm>
 #include <thread>
 #include "cfg.h"
 #include "net_exc.h"
@@ -7,140 +8,158 @@
 #include "tls_socket.h"
 using namespace std;
 using namespace std::chrono;
+namespace rng = std::ranges;
+using namespace nes;
 
 namespace nes::net {
 
-  milliseconds calc_intervalo_proporcional(size_t tentativas)
+  milliseconds calculate_interval_retry(size_t retry_count)
   {
-    // O intervalo cresce proporcionalmente sendo 0 == intervalo_passo e tentativas_max == intervalo_max
-    double intervalo_dif = static_cast<double>((cfg::net::intervalo_max - cfg::net::intervalo_passo).count());
-    double tentativas_prop = static_cast<double>(tentativas) / cfg::net::tentativas_max;
-    return cfg::net::intervalo_passo + milliseconds { static_cast<milliseconds::rep>(intervalo_dif * tentativas_prop) };
+    // The time span grows as the more tries
+    // Be 0 == wait_io_step_min and io_max_retry == wait_io_step_max
+    retry_count = min(retry_count, cfg::net::io_max_retry);
+    double interval_dif = static_cast<double>((cfg::net::wait_io_step_max - cfg::net::wait_io_step_min).count());
+    double retry_coef = static_cast<double>(retry_count) / cfg::net::io_max_retry;
+    return cfg::net::wait_io_step_min + milliseconds { static_cast<milliseconds::rep>(interval_dif * retry_coef) };
   }
 
-  // Funções de entrada io
+  // Input Algorithms
   template <class S, class R, class P>
-  pair<vector<byte>, ptrdiff_t> receber_ate_delim(S& sock, span<const byte> delim, duration<R, P> tempo_exp, size_t tam_max)
+  pair<vector<byte>, size_t> receive_until_delimiter(S& sock, span<const byte> delim, duration<R, P> time_expire, size_t max_size)
   {
     vector<byte> ret;
 
-    // Fica continuamente tentando receber os dados
-    auto inicio = steady_clock::now();
-    while (steady_clock::now() - inicio < tempo_exp)
+    // Read data until receive the deliminator
+    // The time e size params sets the threasholds for the reading
+    auto start = steady_clock::now();
+    milliseconds interval = cfg::net::wait_io_step_min;
+    size_t retry_count = 0;
+    while (steady_clock::now() - start < time_expire)
     {
-      auto dados = sock.receber();
-
-      // Se recebeu dados
-      if (dados.size() > 0)
+      const auto data = sock.receive();
+      if (data.size() > 0)
       {
-        // Verificação para não receber muitooos dados
-        if (ret.size() + dados.size() > tam_max)
-          throw socket_rec_excedente { "Recebeu mais dados (" + to_string(ret.size() + dados.size()) +
-            " B) que o máximo (" + to_string(tam_max) + " B)!" };
+        // Excess data check
+        if (ret.size() + data.size() > max_size)
+          throw socket_excess_data { "Received more data ({}B) than the maximum ({}B)!", ret.size() + data.size(), max_size };
 
-        // Adiciona ao retorno e procura o delimitador
-        ret.insert(ret.end(), dados.begin(), dados.end());
-        if (auto it = search(ret.begin(), ret.end(), delim.begin(), delim.end()); it != ret.end())
-          return { ret, it - ret.begin() };
+        // Collect in the return value and try to find the deliminator
+        ret.insert(ret.end(), data.begin(), data.end());
+        if (auto it = rng::search(ret, delim).begin(); it != ret.end())
+          return { ret, static_cast<size_t>(it - ret.begin()) };
 
+        // When read some data reset the progressive waiting
+        interval = cfg::net::wait_io_step_min;
+        retry_count = 0;
       }
-
-      // Aguarda e incrementa a espera
-      this_thread::sleep_for(cfg::net::intervalo_passo);
+      else
+      {
+        // If no data receive sleeps (at every retry a little more time)
+        interval = calculate_interval_retry(++retry_count);
+        this_thread::sleep_for(interval);
+      }
     }
 
-    // Chegou aqui estourou o tempo
-    throw socket_rec_expirado { "Tempo de espera " + to_string(tempo_exp.count()) + " expirado! "
-      "Sem delimitador! Recebeu " + to_string(ret.size()) + " Bytes!" };
+    throw socket_timeout { "Wait time ({}) expired while especting the deliminator! Received {} bytes!", time_expire, ret.size() };
   }
 
   template <class S, class R, class P>
-  vector<byte> receber_ate_tam(S& sock, size_t tam, duration<R, P> tempo_exp)
+  vector<byte> receive_until_size(S& sock, size_t total_size, duration<R, P> time_expire)
   {
     vector<byte> ret;
 
-    // Fica continuamente tentando receber os dados
-    auto inicio = steady_clock::now();
-    while (steady_clock::now() - inicio < tempo_exp)
+    // Read data until receive the exact number of bytes
+    auto start = steady_clock::now();
+    milliseconds interval = cfg::net::wait_io_step_min;
+    size_t retry_count = 0;
+    while (steady_clock::now() - start < time_expire)
     {
-      auto dados = sock.receber();
-
-      // Se recebeu dados
-      if (dados.size() > 0)
+      const auto data = sock.receive();
+      if (data.size() > 0)
       {
-        // Verificação para não receber muitooos dados
-        if (ret.size() + dados.size() > tam)
-          throw socket_rec_excedente { "Recebeu mais dados (" + to_string(ret.size() + dados.size()) +
-            "B) que o tamanho especificado (" + to_string(tam) + "B)!" };
+        // Excess data check
+        if (ret.size() + data.size() > total_size)
+          throw socket_excess_data { "Received more data ({}B) than the expected ({}B)!",
+                                     ret.size() + data.size(), total_size };
 
-        // Adiciona ao retorno e verifica se atingiu o tamanho
-        ret.insert(ret.end(), dados.begin(), dados.end());
-        if (ret.size() == tam)
+        // Collect in the return value and check if received all the data needed
+        ret.insert(ret.end(), data.begin(), data.end());
+        if (ret.size() == total_size)
           return ret;
-      }
 
-      // Aguarda e incrementa a espera
-      this_thread::sleep_for(cfg::net::intervalo_passo);
+        // When read some data reset the progressive waiting
+        interval = cfg::net::wait_io_step_min;
+        retry_count = 0;
+      }
+      else
+      {
+        // If no data receive sleeps (at every retry a little more time)
+        interval = calculate_interval_retry(++retry_count);
+        this_thread::sleep_for(interval);
+      }
     }
 
-    // Chegou aqui estourou o tempo
-    throw socket_rec_expirado { "Tempo de espera " + to_string(tempo_exp.count()) + " expirado! "
-      "Não chegou ao tamanho " + to_string(tam) + " Bytes! Recebeu " + to_string(ret.size()) + " Bytes!" };
+    throw socket_timeout { "Wait time {} expired, while expecting {} bytes! Received {} bytes!",
+                           time_expire, total_size, ret.size() };
   }
 
   template <class S, class R, class P>
-  vector<byte> receber_ao_menos(S& sock, size_t tam, duration<R, P> tempo_exp)
+  vector<byte> receive_at_least(S& sock, size_t at_least_size, duration<R, P> time_expire)
   {
     vector<byte> ret;
 
-    // Fica continuamente tentando receber os dados
-    auto inicio = steady_clock::now();
-    while (steady_clock::now() - inicio < tempo_exp)
+    // Read data until receive the al least some number of bytes
+    auto start = steady_clock::now();
+    milliseconds interval = cfg::net::wait_io_step_min;
+    size_t retry_count = 0;
+    while (steady_clock::now() - start < time_expire)
     {
-      auto dados = sock.receber();
-
-      // Se recebeu dados
-      if (dados.size() > 0)
+      const auto data = sock.receive();
+      if (data.size() > 0)
       {
-        // Adiciona ao retorno e verifica se atingiu o tamanho
-        ret.insert(ret.end(), dados.begin(), dados.end());
-        if (ret.size() >= tam)
+        // Collect in the return value and check if received at least the data needed
+        ret.insert(ret.end(), data.begin(), data.end());
+        if (ret.size() >= at_least_size)
           return ret;
-      }
 
-      // Aguarda e incrementa a espera
-      this_thread::sleep_for(cfg::net::intervalo_passo);
+        // When read some data reset the progressive waiting
+        interval = cfg::net::wait_io_step_min;
+        retry_count = 0;
+      }
+      else
+      {
+        // If no data receive sleeps (at every retry a little more time)
+        interval = calculate_interval_retry(++retry_count);
+        this_thread::sleep_for(interval);
+      }
     }
 
-    // Chegou aqui estourou o tempo
-    throw socket_rec_expirado { "Tempo de espera " + to_string(tempo_exp.count()) + " expirado! "
-      "Não recebeu ao menos " + to_string(tam) + " Bytes ! Recebeu " + to_string(ret.size()) + " Bytes!" };
+    throw socket_timeout { "Waiting time {} expired, while expecting at least {} bytes! Received {} bytes!",
+                           time_expire, at_least_size, ret.size() };
   }
 
   template <class S, class R, class P>
-  void receber_resto(S& sock, vector<byte>& dados, size_t tam, duration<R, P> tempo_exp)
+  void receive_remaining(S& sock, vector<byte>& data, size_t total_size, duration<R, P> time_expire)
   {
-    if (dados.size() < tam)
+    if (data.size() < total_size)
     {
-      auto resto = receber_ate_tam(sock, tam - dados.size(), tempo_exp);
-      dados.insert(dados.end(), resto.begin(), resto.end());
+      auto rem = receive_until_size(sock, total_size - data.size(), time_expire);
+      data.insert(data.end(), rem.begin(), rem.end());
     }
   }
 
-  // Instanciações do template, devem vir ao final para funcionar no gcc e clang
-  // Instância as utilizações
-  template pair<vector<byte>, ptrdiff_t> receber_ate_delim(socket&, span<const byte>, seconds, size_t);
-  template pair<vector<byte>, ptrdiff_t> receber_ate_delim(socket&, span<const byte>, milliseconds, size_t);
-  template vector<byte> receber_ate_tam(socket&, size_t, seconds);
-  template vector<byte> receber_ate_tam(socket&, size_t, milliseconds);
-  template vector<byte> receber_ao_menos(socket&, size_t, seconds);
-  template void receber_resto(socket&, vector<byte>&, size_t, seconds);
+  // Template instantiations (at end to work with gcc and clang)
+  template pair<vector<byte>, size_t> receive_until_delimiter(socket&, span<const byte>, seconds, size_t);
+  template pair<vector<byte>, size_t> receive_until_delimiter(socket&, span<const byte>, milliseconds, size_t);
+  template vector<byte> receive_until_size(socket&, size_t, seconds);
+  template vector<byte> receive_until_size(socket&, size_t, milliseconds);
+  template vector<byte> receive_at_least(socket&, size_t, seconds);
+  template void receive_remaining(socket&, vector<byte>&, size_t, seconds);
 
-  template pair<vector<byte>, ptrdiff_t> receber_ate_delim(tls_socket&, span<const byte>, seconds, size_t);
-  template pair<vector<byte>, ptrdiff_t> receber_ate_delim(tls_socket&, span<const byte>, milliseconds, size_t);
-  template vector<byte> receber_ate_tam(tls_socket&, size_t, seconds);
-  template vector<byte> receber_ate_tam(tls_socket&, size_t, milliseconds);
-  template vector<byte> receber_ao_menos(tls_socket&, size_t, seconds);
-  template void receber_resto(tls_socket&, vector<byte>&, size_t, seconds);
-
+  template pair<vector<byte>, size_t> receive_until_delimiter(tls_socket&, span<const byte>, seconds, size_t);
+  template pair<vector<byte>, size_t> receive_until_delimiter(tls_socket&, span<const byte>, milliseconds, size_t);
+  template vector<byte> receive_until_size(tls_socket&, size_t, seconds);
+  template vector<byte> receive_until_size(tls_socket&, size_t, milliseconds);
+  template vector<byte> receive_at_least(tls_socket&, size_t, seconds);
+  template void receive_remaining(tls_socket&, vector<byte>&, size_t, seconds);
 }

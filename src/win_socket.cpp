@@ -28,87 +28,82 @@ using namespace nes::net;
 
 namespace nes::so {
 
-  // Contador de instâncias para inicialização/finalização da biblioteca
-  atomic<unsigned> contador_inst { 0 };
+  // Global instance counter Init/Destroy
+  atomic<unsigned> wsa_lib_instances { 0 };
 
-  // Inicialização/Finalização da biblioteca
-  void inicializa_WSA();
-  void finaliza_WSA();
+  // WSA (Windows Sockets API) Initialization/Finalization
+  void WSA_init();
+  void WSA_finalizer();
 
-  // Mensagens de erro
+  // Aux error messages
   string msg_err_str(int);
 
-  // Escopo para o SOCKET
-  class socket_raii {
-    SOCKET m_handle;
-  public:
-    socket_raii(SOCKET handle) : m_handle { handle } {};
-    ~socket_raii() { if (m_handle != INVALID_SOCKET) closesocket(m_handle); };
-    SOCKET handle() const { return m_handle; };
-    SOCKET release() { SOCKET s = m_handle; m_handle = INVALID_SOCKET; return s; };
-  };
+  // Aux RAII temporary handle
+  namespace {
+    class socket_raii {
+      SOCKET m_handle;
+    public:
+      socket_raii(SOCKET handle) : m_handle { handle } {};
+      ~socket_raii() { if (m_handle != INVALID_SOCKET) closesocket(m_handle); };
+      SOCKET handle() const { return m_handle; };
+      SOCKET release() { SOCKET s = m_handle; m_handle = INVALID_SOCKET; return s; };
+    };
 
-  // Escopo para addrinfo
-  class addrinfo_raii {
-    addrinfo* m_handle;
-   public:
-    addrinfo_raii(addrinfo* handle) : m_handle { handle } {};
-    ~addrinfo_raii() { if (m_handle) freeaddrinfo(m_handle); };
-  };
+    // Aux RAII addrinfo
+    class addrinfo_raii {
+      addrinfo* m_handle;
+     public:
+      addrinfo_raii(addrinfo* handle) : m_handle { handle } {};
+      ~addrinfo_raii() { if (m_handle) freeaddrinfo(m_handle); };
+    };
+  }
 
   win_socket::win_socket()
     : m_winsocket { INVALID_SOCKET }
   {
-    // Biblioteca dos sockets windows
-    inicializa_WSA();
+    WSA_init();
   }
 
-  win_socket::win_socket(win_socket&& outro) noexcept
-    : m_winsocket { outro.m_winsocket }
-    , m_end_ipv4 { move(outro.m_end_ipv4) }
-    , m_porta_ipv4 { outro.m_porta_ipv4 }
+  win_socket::win_socket(win_socket&& other) noexcept
+    : m_winsocket { other.m_winsocket }
+    , m_ipv4_address { move(other.m_ipv4_address) }
+    , m_ipv4_port { other.m_ipv4_port }
   {
-    outro.m_winsocket = INVALID_SOCKET;
+    other.m_winsocket = INVALID_SOCKET;
 
-    // Biblioteca dos sockets windows
-    inicializa_WSA();
+    WSA_init();
   }
 
-  win_socket& win_socket::operator=(win_socket&& outro) noexcept
+  win_socket& win_socket::operator=(win_socket&& other) noexcept
   {
-    m_winsocket = outro.m_winsocket;
-    outro.m_winsocket = INVALID_SOCKET;
+    m_winsocket = other.m_winsocket;
+    other.m_winsocket = INVALID_SOCKET;
 
-    m_end_ipv4 = move(outro.m_end_ipv4);
-    m_porta_ipv4 = outro.m_porta_ipv4;
+    m_ipv4_address = move(other.m_ipv4_address);
+    m_ipv4_port = other.m_ipv4_port;
 
     return *this;
   }
 
   win_socket::~win_socket()
   {
-    // Fecha o socket se existente
+    // If valid cleanup
     if (m_winsocket != INVALID_SOCKET)
     {
-      // Termina as conexões
       shutdown(m_winsocket, SD_BOTH);
-
-      // Libera os recursos do Socket
       closesocket(m_winsocket);
     }
-
-    // Verifica se deve finalizar o uso dos sockets
-    finaliza_WSA();
+    WSA_finalizer();
   }
 
-  const string& win_socket::end_ipv4() const
+  const string& win_socket::ipv4_address() const
   {
-    return m_end_ipv4;
+    return m_ipv4_address;
   }
 
-  unsigned win_socket::porta_ipv4() const
+  unsigned win_socket::ipv4_port() const
   {
-    return m_porta_ipv4;
+    return m_ipv4_port;
   }
 
   win_socket::native_handle_type win_socket::native_handle() const
@@ -116,321 +111,306 @@ namespace nes::so {
     return m_winsocket;
   }
 
-  void win_socket::escutar(unsigned porta)
+  void win_socket::listen(unsigned port)
   {
     if (m_winsocket != INVALID_SOCKET)
-      throw runtime_error { "win_socket::escutar() o socket já está configurado." };
+      throw nes_exc { "Socket already configured." };
 
-    // Inicializa o SOCKET pela API
     socket_raii sock_serv { socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) };
 
-    // Checa se foi criado com sucesso
     if (sock_serv.handle() == INVALID_SOCKET)
-      throw runtime_error { "win_socket::escutar() erro ao criar uma socket pela API do Windows!" };
+      throw nes_exc { "WSA error on create socket." };
 
-    // Configuração para resolução do endereço
-    addrinfo end_res_cfg;
+    // Address Resolution
+    addrinfo addr_res_cfg;
 
-    memset(&end_res_cfg, 0, sizeof(end_res_cfg));
+    memset(&addr_res_cfg, 0, sizeof(addr_res_cfg));
 
-    end_res_cfg.ai_family = AF_INET;
-    end_res_cfg.ai_socktype = SOCK_STREAM;
-    end_res_cfg.ai_protocol = IPPROTO_TCP;
-    end_res_cfg.ai_flags = AI_PASSIVE;
+    addr_res_cfg.ai_family = AF_INET;
+    addr_res_cfg.ai_socktype = SOCK_STREAM;
+    addr_res_cfg.ai_protocol = IPPROTO_TCP;
+    addr_res_cfg.ai_flags = AI_PASSIVE;
 
-    // Resolução
-    addrinfo *end_res;
-    if (getaddrinfo(NULL, to_string(porta).c_str(), &end_res_cfg, &end_res))
-      throw runtime_error { "win_socket::escutar() erro na resolução do WinSock2 getaddrinfo()!" };
+    addrinfo *addr_res;
+    if (getaddrinfo(NULL, to_string(port).c_str(), &addr_res_cfg, &addr_res))
+      throw nes_exc { "WSA Address resolution error." };
 
-    // RAAI da estrutura do endereço
-    addrinfo_raii addr { end_res };
+    addrinfo_raii addr { addr_res };
 
-    // Liga o servidor ao endereço passando a estrutura
-    if (::bind(sock_serv.handle(), end_res->ai_addr, static_cast<int>(end_res->ai_addrlen)))
-      throw runtime_error { "win_socket::escutar() escutar na porta " + to_string(porta) + " !" };
+    if (::bind(sock_serv.handle(), addr_res->ai_addr, static_cast<int>(addr_res->ai_addrlen)))
+      throw nes_exc { "Socket cannot bind IPV4 port {}.", port };
 
-    // Define o socket servidor como assíncrono
-    u_long iModo = 1;
-    if (ioctlsocket(sock_serv.handle(), FIONBIO, &iModo))
-      throw runtime_error { "win_socket::escutar() não foi possível indicar o socket como assíncrono!" };
+    // Non-blocking socket
+    u_long mode = 1;
+    if (ioctlsocket(sock_serv.handle(), FIONBIO, &mode))
+      throw nes_exc { "Socket error setting a listening socket to non-blocking." };
 
-    // Chamada que configura o Socket para escutar pórem não o bloqueia
-    // SOMAXCONN = Máx de conexões na fila
-    if (listen(sock_serv.handle(), SOMAXCONN))
-      throw runtime_error { "win_socket::escutar() iniciar espera conexões " + to_string(porta) + "!" };
+    // Start listing, but not block
+    // SOMAXCONN = Maximun number of client in queue
+    if (::listen(sock_serv.handle(), SOMAXCONN))
+      throw nes_exc { "Socket error listen on IPv4 port {}.", port };
 
-    // Tudo em riba pode alterar a classe
+    // All ok, can set the class
     m_winsocket = sock_serv.release();
-    m_end_ipv4 = "0.0.0.0";
-    m_porta_ipv4 = porta;
+    m_ipv4_address = "0.0.0.0";
+    m_ipv4_port = port;
   }
 
-  bool win_socket::conectado() const
+  bool win_socket::is_connected() const
   {
-    return m_winsocket != INVALID_SOCKET && m_end_ipv4 != "0.0.0.0" && m_porta_ipv4 != 0;
+    return m_winsocket != INVALID_SOCKET && m_ipv4_address != "0.0.0.0" && m_ipv4_port != 0;
   }
 
-  bool win_socket::escutando() const
+  bool win_socket::is_listening() const
   {
-    return m_winsocket != INVALID_SOCKET && m_end_ipv4 == "0.0.0.0" && m_porta_ipv4 != 0;
+    return m_winsocket != INVALID_SOCKET && m_ipv4_address == "0.0.0.0" && m_ipv4_port != 0;
   }
 
-  bool win_socket::ha_cliente()
+  bool win_socket::has_client()
   {
-    // Validações
-    if (!this->escutando())
+    if (!this->is_listening())
       return false;
 
-    // Estrutura para informar o socket para a info e flag de inicialização
     FD_SET fdset_socket;
-
-    // Timeout
     static timeval timeout { 0L, 0L };
 
-    // Inicializa
+    // Init
     FD_ZERO(&fdset_socket);
     FD_SET(m_winsocket, &fdset_socket);
 
-    // Faz a chamada para verificar se não há nenhuma conexão
+    // OS check if is any client
     if (select(0, &fdset_socket, nullptr, nullptr, &timeout) == SOCKET_ERROR)
       return false;
 
-    // Se o socket está ainda no vetor existe conexões senão não
+    // If socket stay in the vector there is a client
     return FD_ISSET(m_winsocket, &fdset_socket) != 0;
   }
 
-  optional<win_socket> win_socket::aceitar()
+  optional<win_socket> win_socket::accept()
   {
-    // Validações
-    if (!this->escutando())
-      throw runtime_error { "Não inicializado para aceitar conexões!" };
+    if (!this->is_listening())
+      throw nes_exc { "Socket is not listing, cannot accept connection." };
 
-    struct sockaddr_in cliente_info = { 0, 0, 0, 0, 0, 0, 0 };
-    int size = sizeof(cliente_info);
+    struct sockaddr_in client_info = { 0, 0, 0, 0, 0, 0, 0 };
+    int size = sizeof(client_info);
 
-    // Tenta aceitar alguma conexão na fila
-    SOCKET socket_cli = accept(m_winsocket, reinterpret_cast<sockaddr*>(&cliente_info), &size);
+    // Try to get some client
+    SOCKET socket_cli = ::accept(m_winsocket, reinterpret_cast<sockaddr*>(&client_info), &size);
     if (socket_cli == INVALID_SOCKET)
     {
-      // Como o socket não bloqueia verifica se tem não há conexão na fila
+      // Return nullopt only if there is no client
       if (WSAGetLastError() == WSAEWOULDBLOCK)
         return nullopt;
       else
-        throw runtime_error { "Não foi possível aceitar a conexão!" };
+        throw nes_exc { "Socket error accept." };
     }
     else
     {
-      // Cria o novo socket recebido
+      // New client received
       win_socket ret;
       ret.m_winsocket = socket_cli;
 
+      // IPv4 Identification
       // xxx.xxx.xxx.xxx:yyyy
-      wstring ip_porta(32, wchar_t {});
-      DWORD size_str_ip = static_cast<DWORD>(ip_porta.size());
-      if (WSAAddressToStringW(reinterpret_cast<sockaddr*>(&cliente_info), size, nullptr,
-                              ip_porta.data(), &size_str_ip))
-        throw runtime_error { "WSAAddressToStringW falhou" };
+      wstring ip_port(32, wchar_t {});
+      DWORD size_str_ip = static_cast<DWORD>(ip_port.size());
+      if (WSAAddressToStringW(reinterpret_cast<sockaddr*>(&client_info), size, nullptr,
+                              ip_port.data(), &size_str_ip))
+        throw nes_exc { "Socket IPv4 identification fail." };
 
-      ip_porta.resize(size_str_ip);
-      ret.m_end_ipv4.resize(size_str_ip);
-      for (const auto ch : ip_porta)
-        ret.m_end_ipv4.push_back(static_cast<char>(ch));
+      ip_port.resize(size_str_ip);
+      ret.m_ipv4_address.resize(size_str_ip);
+      for (const auto ch : ip_port)
+        ret.m_ipv4_address.push_back(static_cast<char>(ch));
 
-      auto pos = ret.m_end_ipv4.find(':');
+      auto pos = ret.m_ipv4_address.find(':');
       if (pos == string::npos)
-        throw runtime_error { "WSAAddressToStringA não identificou porta" };
+        throw nes_exc { "Socket IPv4 port identification fail." };
 
-      ret.m_porta_ipv4 = stoi(ret.m_end_ipv4.substr(pos + 1));
-      ret.m_end_ipv4.erase(pos);
+      ret.m_ipv4_port = stoi(ret.m_ipv4_address.substr(pos + 1));
+      ret.m_ipv4_address.erase(pos);
 
-      // Seta como não bloqueia
-      u_long iModo = 1;
-      if (ioctlsocket(ret.m_winsocket, FIONBIO, &iModo))
-        throw runtime_error { "Ioctlsocket falhou" };
+      // Set as non blocking
+      u_long mode = 1;
+      if (ioctlsocket(ret.m_winsocket, FIONBIO, &mode))
+        throw nes_exc { "Socket error setting a listening socket to non-blocking." };
 
       return { move(ret) };
     }
   }
 
-  void win_socket::conectar(string endereco, unsigned porta)
+  void win_socket::connect(string addr, unsigned port)
   {
     if (m_winsocket != INVALID_SOCKET)
-      throw runtime_error { "O socket já esta configurado." };
+      throw nes_exc { "Socket already configured." };
 
-    // Inicializa o SOCKET pela API
     socket_raii socket_cli { socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) };
 
-    // Checa se foi criado com sucesso
     if (socket_cli.handle() == INVALID_SOCKET)
-      throw runtime_error { "Não foi possível criar um socket!" };
+      throw nes_exc { "WSA error on create socket." };
 
-    // Configuração para resolução do endereço
-    struct addrinfo end_res_cfg;
+    // Address Resolution
+    struct addrinfo addr_res_cfg;
 
-    memset(&end_res_cfg, 0, sizeof(end_res_cfg));
+    memset(&addr_res_cfg, 0, sizeof(addr_res_cfg));
 
-    end_res_cfg.ai_family = AF_INET;
-    end_res_cfg.ai_socktype = SOCK_STREAM;
-    end_res_cfg.ai_protocol = IPPROTO_TCP;
-    end_res_cfg.ai_flags = AI_PASSIVE;
+    addr_res_cfg.ai_family = AF_INET;
+    addr_res_cfg.ai_socktype = SOCK_STREAM;
+    addr_res_cfg.ai_protocol = IPPROTO_TCP;
+    addr_res_cfg.ai_flags = AI_PASSIVE;
 
-    // Resolução
-    struct addrinfo *end_res;
-    if (getaddrinfo(endereco.data(), to_string(porta).c_str(), &end_res_cfg, &end_res))
-      throw runtime_error { "Erro na resolução do WinSock2 getaddrinfo()!" };
+    struct addrinfo *addr_res;
+    if (getaddrinfo(addr.data(), to_string(port).c_str(), &addr_res_cfg, &addr_res))
+      throw nes_exc { "WSA Address resolution error." };
 
-    // RAAI da estrutura do endereço
-    addrinfo_raii addr { end_res };
+    addrinfo_raii addr { addr_res };
 
-    // Liga o servidor ao endereço passando a estrutura
-    if (connect(socket_cli.handle(), end_res->ai_addr, static_cast<int>(end_res->ai_addrlen)))
-      throw runtime_error { "Não foi possível conectar ao endereço '" + endereco + ":" + to_string(porta) + "'!" };
+    // Resolved IPv4
+    string ip;
+    ip.resize(INET_ADDRSTRLEN);
 
-    // Define o socket servidor como assíncrono
-    u_long iModo = 1;
-    if (ioctlsocket(socket_cli.handle(), FIONBIO, &iModo))
-      throw runtime_error { "Não foi possível indicar o socket como assíncrono!" };
+    struct sockaddr_in *addr4 = reinterpret_cast<struct sockaddr_in*>(addr_res->ai_addr);
+    const char* res = inet_ntop(AF_INET, &addr4->sin_addr, ip.data(), INET_ADDRSTRLEN);
 
-    // Tudo em riba pode alterar a classe
+    if (!res)
+      throw nes_exc { "WSA extract IPv4 address error." };
+
+    ip.resize(strlen(res));
+
+    if (::connect(socket_cli.handle(), addr_res->ai_addr, static_cast<int>(addr_res->ai_addrlen)))
+      throw nes_exc { "Socket error connecting at address '{}({}):{}'.", addr, ip, port };
+
+    // Non blocking socket
+    u_long mode = 1;
+    if (ioctlsocket(socket_cli.handle(), FIONBIO, &mode))
+      throw nes_exc { "Socket error setting the socket to non-blocking." };
+
+    // All ok, can set the class
     m_winsocket = socket_cli.release();
-    m_end_ipv4 = move(endereco);
-    m_porta_ipv4 = porta;
+    m_ipv4_address = move(ip);
+    m_ipv4_port = port;
   }
 
-  void win_socket::desconectar()
+  void win_socket::disconnect()
   {
-    if (this->conectado())
+    if (this->is_connected())
     {
-      // Termina as conexões
       shutdown(m_winsocket, SD_BOTH);
-
-      // Libera os recursos do Socket
       closesocket(m_winsocket);
 
       m_winsocket = INVALID_SOCKET;
-      m_end_ipv4 = { "0.0.0.0" };
-      m_porta_ipv4 = 0;
+      m_ipv4_address = { "0.0.0.0" };
+      m_ipv4_port = 0;
     }
   }
 
-  void win_socket::enviar(span<const std::byte> dados)
+  void win_socket::send(span<const std::byte> data_span)
   {
-    // Validação
-    if (!this->conectado())
-      throw runtime_error { "O socket precisa estar conectado para enviar dados!" };
+    if (!this->is_connected())
+      throw nes_exc { "Socket is not connected, cannot send data." };
 
-    if (dados.size() == 0)
+    if (data_span.size() == 0)
       return;
 
-    size_t tentativas = 0;
-    milliseconds intervalo = cfg::net::intervalo_passo;
-    for (int i = 0;
-         i < static_cast<int>(dados.size());
-         i += static_cast<int>(min(dados.size() - i, cfg::net::bloco))) {
-      int ret = send(m_winsocket,
-                     reinterpret_cast<const char*>(dados.data() + i),
-                     static_cast<int>(min(dados.size() - i, cfg::net::bloco)),
-                     0);
+    // Send the data in cfg::net::packet_size chunks
+    size_t retry_count = 0;
+    auto interval = cfg::net::wait_io_step_min;
+    while (data_span.size())
+    {
+      auto chunk_size = min(data_span.size(), cfg::net::packet_size);
+      auto chunk = data_span.first(chunk_size);
+
+      auto ret = ::send(m_winsocket, reinterpret_cast<const char*>(chunk.data()), chunk.size(), 0);
       if (ret == SOCKET_ERROR)
       {
-        auto erro = WSAGetLastError();
-
-        // Falta de espaço no buffer da uma segunda chance
-        if (tentativas < cfg::net::tentativas_max && erro == WSAEWOULDBLOCK)
+        if (retry_count < cfg::net::io_max_retry && errno == WSAEWOULDBLOCK)
         {
-          this_thread::sleep_for(intervalo);
-          tentativas++;
-          i -= static_cast<int>(cfg::net::bloco);
-
-          // Baseado nas tentativas calcula o próximo intervalo
-          intervalo = calc_intervalo_proporcional(tentativas);
+          // As get more tries increase the wait
+          this_thread::sleep_for(interval);
+          retry_count++;
+          interval = calculate_interval_retry(retry_count);
         }
         else if (erro == WSAECONNABORTED)
-          throw socket_desconectado { "Erro no envio de dados, socket foi fechado pelo destino!" };
+          throw socket_disconnected { "Socket closed by destination." };
         else
-          throw runtime_error { "Troca de dados. Cód. Erro: " + msg_err_str(erro) };
+          throw nes_exc { "Error on socket send data. Error: {}", msg_err_str(erro) };
       }
       else
       {
-        if (ret < static_cast<int>(min(dados.size() - i, cfg::net::bloco)))
-          i -= static_cast<int>(min(dados.size() - i, cfg::net::bloco) - ret);
-
-        tentativas = 0;
-        intervalo = cfg::net::intervalo_passo;
+        chunk_size = ret;
+        retry_count = 0;
+        interval = cfg::net::wait_io_step_min;
       }
+
+      // Shrink the span
+      data_span = data_span.last(data_span.size() - chunk_size);
     }
+
   }
 
-  vector<std::byte> win_socket::receber()
+  vector<std::byte> win_socket::receive()
   {
-    // Validação
-    if (!this->conectado())
-      throw runtime_error { "Não conectado para receber dados!" };
+    if (!this->is_connected())
+      throw nes_exc { "Socket is not connected, cannot receive data." };
 
-    array<std::byte, cfg::net::bloco> dados;
+    array<std::byte, cfg::net::packet_size> packet_buffer;
     vector<std::byte> ret;
 
-    // Enquanto houver dados a receber ou a conexão estiver ativa
     while (true)
     {
-      auto qtde = recv(m_winsocket, reinterpret_cast<char*>(dados.data()), static_cast<int>(dados.size()), 0);
-
-      // Recebe os dados do socket, não bloqueia
+      auto qtde = recv(m_winsocket, reinterpret_cast<char*>(packet_buffer.data()),
+        static_cast<int>(packet_buffer.size()), 0);
       if (qtde == SOCKET_ERROR)
       {
         auto erro = WSAGetLastError();
 
-        // Sem dados a receber, mas com conexão ativa
+        // No data to receive, but the connection is active
         if (erro == WSAEWOULDBLOCK)
           break;
         else
-          throw runtime_error { "Erro no recebimento. Código: " + msg_err_str(erro) + "!" };
+          throw nes_exc { "Error on socket data receive. Error: {}.", msg_err_str(erro) };
       }
       else if (qtde == 0)
       {
-        // Foi fechado o socket, se possui dados retorna
+        // Closed socket, if there is data breaks
         if (ret.size() > 0)
           break;
 
-        throw socket_desconectado { "Socket foi fechado normalmente!" };
+        throw socket_disconnected { "Socket closed normally." };
       }
 
-      // Vai guardando os dados recebidos na variável
-      ret.insert(ret.end(), dados.begin(), dados.begin() + qtde);
+      // Collect the data
+      ret.insert(ret.end(), packet_buffer.begin(), packet_buffer.begin() + qtde);
     }
 
     return ret;
   }
 
-  void inicializa_WSA()
+  void WSA_init()
   {
-    // Se é a primeira instância da aplicação inicializa
-    if (contador_inst++ == 0)
+    // Initialize on first instance
+    if (wsa_lib_instances++ == 0)
     {
       WSADATA wsaData;
 
-      // Versão da WS2_32.Lib 2.2
+      // Version da WS2_32.Lib 2.2
       auto retorno = WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-      // Valida retorno
       if (retorno)
-        throw runtime_error { "Erro inicialização WSA: " + msg_err_str(retorno) + "!" };
+        throw nes_exc { "WSA init error: {}.", msg_err_str(retorno) };
 
-      // Valida versão
+      // Only 2.2 version suported by nes_sockets
       if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2)
       {
-        // Descarrega, pois é a versão errada
         WSACleanup();
-        throw runtime_error { "WSA Versão exigida: 2.2. Versão Retornada: " + to_string(LOBYTE(wsaData.wVersion)) + "." +
-          to_string(HIBYTE(wsaData.wVersion)) + "!" };
+        throw nes_exc { "WSA required version: 2.2. Version in this system: {}.{}!",
+          LOBYTE(wsaData.wVersion), HIBYTE(wsaData.wVersion) };
       }
     }
   }
 
-  void finaliza_WSA()
+  void WSA_finalizer()
   {
-    if (--contador_inst == 0)
+    if (--wsa_lib_instances == 0)
       WSACleanup();
   }
 
@@ -439,7 +419,7 @@ namespace nes::so {
     array<char, 1024> buff {};
     if (FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
       err_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff.data(), static_cast<DWORD>(buff.size()), NULL) == 0)
-      return to_string(err_code) + " - msg_err_str! Erro retornado: " + to_string(WSAGetLastError());
+      return to_string(err_code) + " - msg_err_str! Last WSA Error: " + to_string(WSAGetLastError());
     else
       return to_string(err_code) + " - " + buff.data();
   }

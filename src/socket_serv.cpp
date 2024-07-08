@@ -5,45 +5,44 @@ using namespace std;
 namespace nes::net {
 
   template <class S>
-  socket_serv_tmpl<S>::socket_serv_tmpl(unsigned ipv4_porta)
+  socket_serv_tmpl<S>::socket_serv_tmpl(unsigned port)
   {
-    m_sock_so.escutar(ipv4_porta);
+    m_sock_so.listen(port);
   }
 
   template <class S>
-  void socket_serv_tmpl<S>::escutar(unsigned ipv4_porta)
+  void socket_serv_tmpl<S>::listen(unsigned port)
   {
-    m_sock_so.escutar(ipv4_porta);
+    m_sock_so.listen(port);
   }
 
   template <class S>
-  unsigned socket_serv_tmpl<S>::porta_ipv4() const
+  unsigned socket_serv_tmpl<S>::ipv4_port() const
   {
-    return m_sock_so.porta_ipv4();
+    return m_sock_so.ipv4_port();
   }
 
   template <class S>
-  bool socket_serv_tmpl<S>::escutando() const
+  bool socket_serv_tmpl<S>::is_listening() const
   {
-    return m_sock_so.escutando();
+    return m_sock_so.is_listening();
   }
 
   template <class S>
-  bool socket_serv_tmpl<S>::ha_cliente()
+  bool socket_serv_tmpl<S>::has_client()
   {
-    return m_sock_so.ha_cliente();
+    return m_sock_so.has_client();
   }
 
   template <class S>
-  optional<socket_tmpl<S>> socket_serv_tmpl<S>::aceitar()
+  optional<socket> socket_serv_tmpl<S>::accept()
   {
-    auto sock_act = m_sock_so.aceitar();
+    auto sock_act = m_sock_so.accept();
     if (sock_act)
-      return socket_tmpl<S> { move(*sock_act) };
+      return socket { move(*sock_act) };
     else
       return nullopt;
   }
 
-  // Instanciar Template
   template class socket_serv_tmpl<socket_so_impl>;
 }

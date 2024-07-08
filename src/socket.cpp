@@ -13,114 +13,113 @@ using namespace nes::so;
 namespace nes::net {
 
   template <class S>
-  socket_tmpl<S>::socket_tmpl(string endereco, unsigned porta)
+  socket_tmpl<S>::socket_tmpl(string addr, unsigned port)
   {
-    this->conectar(move(endereco), porta);
+    this->connect(move(addr), port);
   }
 
   template <class S>
-  socket_tmpl<S>::socket_tmpl(S outro)
-    : m_sock_so { move(outro) }
+  socket_tmpl<S>::socket_tmpl(S&& other)
+    : m_sock_so { move(other) }
   {
 
   }
 
   template <class S>
-  void socket_tmpl<S>::conectar(string endereco, unsigned porta)
+  void socket_tmpl<S>::connect(string addr, unsigned port)
   {
-    m_sock_so.conectar(move(endereco), porta);
+    m_sock_so.connect(move(addr), port);
   }
 
   template <class S>
-  void socket_tmpl<S>::desconectar()
+  void socket_tmpl<S>::disconnect()
   {
-    m_sock_so.desconectar();
+    m_sock_so.disconnect();
   }
 
   template <class S>
-  const string& socket_tmpl<S>::end_ipv4() const
+  const string& socket_tmpl<S>::ipv4_address() const
   {
-    return m_sock_so.end_ipv4();
+    return m_sock_so.ipv4_address();
   }
 
   template <class S>
-  unsigned socket_tmpl<S>::porta_ipv4() const
+  unsigned socket_tmpl<S>::ipv4_port() const
   {
-    return m_sock_so.porta_ipv4();
+    return m_sock_so.ipv4_port();
   }
 
   template <class S>
-  bool socket_tmpl<S>::conectado() const
+  bool socket_tmpl<S>::is_connected() const
   {
-    return m_sock_so.conectado();
+    return m_sock_so.is_connected();
   }
 
   template <class S>
-  socket_tmpl<S>::native_handle_type socket_tmpl<S>::native_handle() const
+  typename socket_tmpl<S>::native_handle_type socket_tmpl<S>::native_handle() const
   {
     return m_sock_so.native_handle();
   }
 
   template <class S>
-  void socket_tmpl<S>::enviar(span<const byte> dados)
+  void socket_tmpl<S>::send(span<const byte> data)
   {
-    m_sock_so.enviar(dados);
+    m_sock_so.send(data);
   }
 
   template <class S>
-  void socket_tmpl<S>::enviar(string_view dados_str)
+  void socket_tmpl<S>::send(string_view data_str)
   {
-    m_sock_so.enviar(as_bytes(span { dados_str.begin(), dados_str.end() }));
+    m_sock_so.send(as_bytes(span { data_str.begin(), data_str.end() }));
   }
 
   template <class S>
-  vector<byte> socket_tmpl<S>::receber()
+  vector<byte> socket_tmpl<S>::receive()
   {
-    return m_sock_so.receber();
-  }
-
-  template <class S>
-  template <class R, class P>
-  pair<vector<byte>, ptrdiff_t>
-  socket_tmpl<S>::receber_ate_delim(span<const byte> delim, duration<R, P> tempo_exp, size_t tam_max)
-  {
-    using nes::net::receber_ate_delim;
-    return receber_ate_delim(*this, delim, tempo_exp, tam_max);
+    return m_sock_so.receive();
   }
 
   template <class S>
   template <class R, class P>
-  vector<byte> socket_tmpl<S>::receber_ate_tam(size_t tam, duration<R, P> tempo_exp)
+  pair<vector<byte>, size_t>
+  socket_tmpl<S>::receive_until_delimiter(span<const byte> delim, duration<R, P> time_expire, size_t max_size)
   {
-    using nes::net::receber_ate_tam;
-    return receber_ate_tam(*this, tam, tempo_exp);
+    using nes::net::receive_until_delimiter;
+    return receive_until_delimiter(*this, delim, time_expire, max_size);
   }
 
   template <class S>
   template <class R, class P>
-  vector<byte> socket_tmpl<S>::receber_ao_menos(size_t tam, duration<R, P> tempo_exp)
+  vector<byte> socket_tmpl<S>::receive_until_size(size_t exact_size, duration<R, P> time_expire)
   {
-    using nes::net::receber_ao_menos;
-    return receber_ao_menos(*this, tam, tempo_exp);
+    using nes::net::receive_until_size;
+    return receive_until_size(*this, exact_size, time_expire);
   }
 
   template <class S>
   template <class R, class P>
-  void socket_tmpl<S>::receber_resto(vector<byte>& dados, size_t tam, duration<R, P> tempo_exp)
+  vector<byte> socket_tmpl<S>::receive_at_least(size_t at_least_size, duration<R, P> time_expire)
   {
-    using nes::net::receber_resto;
-    receber_resto(*this, dados, tam, tempo_exp);
+    using nes::net::receive_at_least;
+    return receive_at_least(*this, at_least_size, time_expire);
   }
 
-  // Instanciações do template, devem vir ao final para funcionar no gcc e clang
-  // Instanciar Template
+  template <class S>
+  template <class R, class P>
+  void socket_tmpl<S>::receive_remaining(vector<byte>& data, size_t total_size, duration<R, P> time_expire)
+  {
+    using nes::net::receive_remaining;
+    receive_remaining(*this, data, total_size, time_expire);
+  }
+
+  // Template class instanciation
   template class socket_tmpl<socket_so_impl>;
 
-  // Instância as funções utilizadas
-  template pair<vector<byte>, ptrdiff_t> socket_tmpl<socket_so_impl>::receber_ate_delim(span<const byte>, seconds, size_t);
-  template pair<vector<byte>, ptrdiff_t> socket_tmpl<socket_so_impl>::receber_ate_delim(span<const byte>, milliseconds, size_t);
-  template vector<byte> socket_tmpl<socket_so_impl>::receber_ate_tam(size_t, seconds);
-  template vector<byte> socket_tmpl<socket_so_impl>::receber_ate_tam(size_t, milliseconds);
-  template vector<byte> socket_tmpl<socket_so_impl>::receber_ao_menos(size_t, seconds);
-  template void socket_tmpl<socket_so_impl>::receber_resto(vector<byte>&, size_t, seconds);
+  // Function template instanciation
+  template pair<vector<byte>, size_t> socket_tmpl<socket_so_impl>::receive_until_delimiter(span<const byte>, seconds, size_t);
+  template pair<vector<byte>, size_t> socket_tmpl<socket_so_impl>::receive_until_delimiter(span<const byte>, milliseconds, size_t);
+  template vector<byte> socket_tmpl<socket_so_impl>::receive_until_size(size_t, seconds);
+  template vector<byte> socket_tmpl<socket_so_impl>::receive_until_size(size_t, milliseconds);
+  template vector<byte> socket_tmpl<socket_so_impl>::receive_at_least(size_t, seconds);
+  template void socket_tmpl<socket_so_impl>::receive_remaining(vector<byte>&, size_t, seconds);
 }
