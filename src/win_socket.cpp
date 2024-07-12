@@ -15,7 +15,7 @@
 // WINSOCK2 API
 #ifdef _WIN32_WINNT
 #  undef _WIN32_WINNT
-#  define _WIN32_WINNT 0x501
+#  define _WIN32_WINNT 0x600
 #endif
 
 #include <winsock2.h>
@@ -263,7 +263,7 @@ namespace nes::so {
     if (getaddrinfo(addr.data(), to_string(port).c_str(), &addr_res_cfg, &addr_res))
       throw nes_exc { "WSA Address resolution error." };
 
-    addrinfo_raii addr { addr_res };
+    addrinfo_raii addr_inf_scope { addr_res };
 
     // Resolved IPv4
     string ip;
@@ -330,10 +330,10 @@ namespace nes::so {
           retry_count++;
           interval = calculate_interval_retry(retry_count);
         }
-        else if (erro == WSAECONNABORTED)
+        else if (errno == WSAECONNABORTED)
           throw socket_disconnected { "Socket closed by destination." };
         else
-          throw nes_exc { "Error on socket send data. Error: {}", msg_err_str(erro) };
+          throw nes_exc { "Error on socket send data. Error: {}", msg_err_str(errno) };
       }
       else
       {

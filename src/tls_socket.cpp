@@ -240,7 +240,7 @@ namespace nes::net {
       return string {};
   }
 
-  void tls_socket::send(span<const byte> data_span)
+  void tls_socket::send(span<const std::byte> data_span)
   {
     if (!m_sock.is_connected())
       throw nes_exc { "The TLS socket is not connected." };
@@ -287,7 +287,7 @@ namespace nes::net {
     this->send(as_bytes(span { data_str.begin(), data_str.end() }));
   }
 
-  vector<byte> tls_socket::receive()
+  vector<std::byte> tls_socket::receive()
   {
     if (!m_sock.is_connected())
       throw nes_exc { "The TLS socket is not connected." };
@@ -295,8 +295,8 @@ namespace nes::net {
     if (m_handshake != handshake_state::ok)
       this->handshake();
 
-    array<byte, cfg::net::packet_size> packet_buffer;
-    vector<byte> ret;
+    array<std::byte, cfg::net::packet_size> packet_buffer;
+    vector<std::byte> ret;
 
     while (true)
     {
@@ -331,29 +331,29 @@ namespace nes::net {
   }
 
   template <class R, class P>
-  pair<vector<byte>, size_t>
-  tls_socket::receive_until_delimiter(span<const byte> delim, duration<R, P> time_expire, size_t max_size)
+  pair<vector<std::byte>, size_t>
+  tls_socket::receive_until_delimiter(span<const std::byte> delim, duration<R, P> time_expire, size_t max_size)
   {
     using nes::net::receive_until_delimiter;
     return receive_until_delimiter(*this, delim, time_expire, max_size);
   }
 
   template <class R, class P>
-  vector<byte> tls_socket::receive_until_size(size_t exact_size, duration<R, P> time_expire)
+  vector<std::byte> tls_socket::receive_until_size(size_t exact_size, duration<R, P> time_expire)
   {
     using nes::net::receive_until_size;
     return receive_until_size(*this, exact_size, time_expire);
   }
 
   template <class R, class P>
-  vector<byte> tls_socket::receive_at_least(size_t at_least_size, duration<R, P> time_expire)
+  vector<std::byte> tls_socket::receive_at_least(size_t at_least_size, duration<R, P> time_expire)
   {
     using nes::net::receive_at_least;
     return receive_at_least(*this, at_least_size, time_expire);
   }
 
   template <class R, class P>
-  void tls_socket::receive_remaining(vector<byte>& data, size_t total_size, duration<R, P> time_expire)
+  void tls_socket::receive_remaining(vector<std::byte>& data, size_t total_size, duration<R, P> time_expire)
   {
     using nes::net::receive_remaining;
     receive_remaining(*this, data, total_size, time_expire);
@@ -454,11 +454,11 @@ namespace nes::net {
   }
 
   // Template instantiations (at end to work with gcc and clang)
-  template pair<vector<byte>, size_t> tls_socket::receive_until_delimiter(span<const byte>, seconds, size_t);
-  template pair<vector<byte>, size_t> tls_socket::receive_until_delimiter(span<const byte>, milliseconds, size_t);
-  template vector<byte> tls_socket::receive_until_size(size_t, seconds);
-  template vector<byte> tls_socket::receive_until_size(size_t, milliseconds);
-  template vector<byte> tls_socket::receive_at_least(size_t, seconds);
-  template void tls_socket::receive_remaining(vector<byte>&, size_t, seconds);
+  template pair<vector<std::byte>, size_t> tls_socket::receive_until_delimiter(span<const std::byte>, seconds, size_t);
+  template pair<vector<std::byte>, size_t> tls_socket::receive_until_delimiter(span<const std::byte>, milliseconds, size_t);
+  template vector<std::byte> tls_socket::receive_until_size(size_t, seconds);
+  template vector<std::byte> tls_socket::receive_until_size(size_t, milliseconds);
+  template vector<std::byte> tls_socket::receive_at_least(size_t, seconds);
+  template void tls_socket::receive_remaining(vector<std::byte>&, size_t, seconds);
 
 }
