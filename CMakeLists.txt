@@ -3,8 +3,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(nes_sockets VERSION 5)
 
-if(MSVC)
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   add_compile_options(/W4 /WX)
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -pedantic -Werror -Wno-unqualified-std-cast-call)
 else()
   add_compile_options(-Wall -Wextra -pedantic -Werror)
 endif()
@@ -45,8 +47,14 @@ if (WIN32)
 endif ()
 
 #~~ Examples
-# Test HTTP GET
-add_executable(test_http_get EXCLUDE_FROM_ALL examples/test_http_get.cpp)
+# HTTP GET
+add_executable(ex_http_get EXCLUDE_FROM_ALL examples/http_get.cpp)
 
-set_property(TARGET test_http_get PROPERTY CXX_STANDARD 20)
-target_link_libraries(test_http_get nes_sockets)
+set_property(TARGET ex_http_get PROPERTY CXX_STANDARD 20)
+target_link_libraries(ex_http_get nes_sockets)
+
+# TCP Echo Server
+add_executable(ex_tcp_echo_server EXCLUDE_FROM_ALL examples/tcp_echo_server.cpp)
+
+set_property(TARGET ex_tcp_echo_server PROPERTY CXX_STANDARD 23)
+target_link_libraries(ex_tcp_echo_server nes_sockets)
