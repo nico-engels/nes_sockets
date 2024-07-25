@@ -1,8 +1,15 @@
 # nes_sockets
 
-Simple socket and secure socket in C++.
+Simple socket and secure socket in modern C++. 
 
-# Requesites
+Non-blocking implementation of sockets for Windows and Linux for sequencial (not asynchronous) programming.
+
+# Requisites
 
 C++20
+
 OpenSSL Library
+
+# Examples
+
+See examples folder.
