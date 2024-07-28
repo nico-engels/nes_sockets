@@ -455,7 +455,8 @@ namespace nes::net {
 
   // Template instantiations (at end to work with gcc and clang)
   template pair<vector<std::byte>, size_t> tls_socket::receive_until_delimiter(span<const std::byte>, seconds, size_t);
-  template pair<vector<std::byte>, size_t> tls_socket::receive_until_delimiter(span<const std::byte>, milliseconds, size_t);
+  template pair<vector<std::byte>, size_t>
+  tls_socket::receive_until_delimiter(span<const std::byte>, milliseconds, size_t);
   template vector<std::byte> tls_socket::receive_until_size(size_t, seconds);
   template vector<std::byte> tls_socket::receive_until_size(size_t, milliseconds);
   template vector<std::byte> tls_socket::receive_at_least(size_t, seconds);

@@ -25,7 +25,8 @@ namespace nes::net {
 
   // Input Algorithms
   template <class S, class R, class P>
-  pair<vector<byte>, size_t> receive_until_delimiter(S& sock, span<const byte> delim, duration<R, P> time_expire, size_t max_size)
+  pair<vector<byte>, size_t> receive_until_delimiter(S& sock, span<const byte> delim, duration<R, P> time_expire,
+    size_t max_size)
   {
     vector<byte> ret;
 
@@ -41,7 +42,8 @@ namespace nes::net {
       {
         // Excess data check
         if (ret.size() + data.size() > max_size)
-          throw socket_excess_data { "Received more data ({}B) than the maximum ({}B)!", ret.size() + data.size(), max_size };
+          throw socket_excess_data { "Received more data ({}B) than the maximum ({}B)!",
+                                     ret.size() + data.size(), max_size };
 
         // Collect in the return value and try to find the deliminator
         ret.insert(ret.end(), data.begin(), data.end());
@@ -60,7 +62,8 @@ namespace nes::net {
       }
     }
 
-    throw socket_timeout { "Wait time ({}) expired while especting the deliminator! Received {} bytes!", time_expire, ret.size() };
+    throw socket_timeout { "Wait time ({}) expired while especting the deliminator! Received {} bytes!",
+                            time_expire, ret.size() };
   }
 
   template <class S, class R, class P>
@@ -134,8 +137,10 @@ namespace nes::net {
       }
     }
 
-    throw socket_timeout { "Waiting time {} expired, while expecting at least {} bytes! Received {} bytes!",
-                           time_expire, at_least_size, ret.size() };
+    throw socket_timeout {
+      "Waiting time {} expired, while expecting at least {} bytes! Received {} bytes!",
+      time_expire, at_least_size, ret.size()
+    };
   }
 
   template <class S, class R, class P>

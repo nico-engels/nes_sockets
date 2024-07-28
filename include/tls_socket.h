@@ -71,11 +71,13 @@ namespace nes::net {
 
     // Read data until receive the exact_size number of bytes
     template <class R, class P = std::ratio<1>>
-    [[nodiscard]] std::vector<std::byte> receive_until_size(std::size_t exact_size, std::chrono::duration<R, P> time_expire);
+    [[nodiscard]] std::vector<std::byte> receive_until_size(std::size_t exact_size,
+      std::chrono::duration<R, P> time_expire);
 
     // Read data until receive the >= at_least_size bytes
     template <class R, class P = std::ratio<1>>
-    [[nodiscard]] std::vector<std::byte> receive_at_least(std::size_t at_least_size, std::chrono::duration<R, P> time_expire);
+    [[nodiscard]] std::vector<std::byte> receive_at_least(std::size_t at_least_size,
+      std::chrono::duration<R, P> time_expire);
 
     // Complete the data arg until the data.size() is equals arg total_size
     template <class R, class P>

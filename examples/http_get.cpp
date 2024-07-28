@@ -70,7 +70,8 @@ try {
 
     cout << "3. Initiate a listen secure server socket on localhost port 55555\n";
     {
-      tls_socket_serv server(55555, "../examples/expired-localhost-public.pem", "../examples/expired-localhost-private.pem");
+      tls_socket_serv server(55555, "../examples/expired-localhost-public.pem",
+        "../examples/expired-localhost-private.pem");
 
       tls_socket client_a("localhost", 55555);
 
