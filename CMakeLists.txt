@@ -46,6 +46,17 @@ if (WIN32)
   target_link_libraries(nes_sockets PUBLIC wsock32 ws2_32)
 endif ()
 
+#~~ Test
+set(nes_sck_test_srcs
+  tests/qtest.h  tests/qtest.cpp
+                 tests/main.cpp
+)
+
+add_executable(nes_socket_test EXCLUDE_FROM_ALL ${nes_sck_test_srcs})
+
+set_property(TARGET nes_socket_test PROPERTY CXX_STANDARD 20)
+target_link_libraries(nes_socket_test nes_sockets)
+
 #~~ Examples
 # HTTP GET
 add_executable(ex_http_get EXCLUDE_FROM_ALL examples/http_get.cpp)
