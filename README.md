@@ -15,8 +15,8 @@ Non-blocking implementation of sockets for Windows and Linux for sequencial (not
 This project uses CMake as build system. In directory ./build/ run:
 
 ```
+cmake ..
 cmake --build .
-make
 ```
 
 Will produce the static library (nes_sockets.a) to link your program.
