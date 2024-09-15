@@ -204,7 +204,8 @@ void test__socket()
         qtest::eq(data_recv, data_send);
 
         // I/O Socket utilities
-        for (const auto i : { byte { 0x00 }, byte { 0x01 }, byte { 0xC0 }, byte { 0xC0 }, byte { 0x02 }, byte { 0x03 } })
+        for (const auto i : { byte { 0x00 }, byte { 0x01 }, byte { 0xC0 },
+                              byte { 0xC0 }, byte { 0x02 }, byte { 0x03 } })
           data_send.push_back(i);
         c.send(data_send);
 
