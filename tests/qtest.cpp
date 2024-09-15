@@ -80,8 +80,6 @@ string read_line(const source_location& loc)
 }
 
 // test_exec_t
-enum class test_exec_status { ok, err, exc };
-
 class test_exec_t
 {
     test_exec_status m_status;
@@ -96,6 +94,7 @@ class test_exec_t
       , m_loc { move(loc) } {};
 
     test_exec_status status() const { return m_status; }
+    bool error() const { return m_status != test_exec_status::ok; }
 
     string loc_str() const
     {
@@ -133,6 +132,8 @@ class sub_package_title_t
 
     const string& title() const { return m_title; }
     size_t size() const { return m_execs.size(); }
+    size_t size_errors() const { return count_if(m_execs.begin(), m_execs.end(),
+                                                 [](const auto& e) { return e.error(); }); }
 
     void exec_add(test_exec_status status, string test_str, source_location loc)
     {
@@ -185,6 +186,8 @@ class sub_package_t
     const string& name() const { return m_name; }
     size_t size() const { return accumulate(m_sub_pkgs_titles.begin(), m_sub_pkgs_titles.end(), size_t { 0 },
                                             [](auto s, const auto& e) { return s + e.size(); }); }
+    size_t size_errors() const { return accumulate(m_sub_pkgs_titles.begin(), m_sub_pkgs_titles.end(), size_t { 0 },
+                                            [](auto s, const auto& e) { return s + e.size_errors(); }); }
 
     // Adiciona novo teste
     void exec_add(test_exec_status status, string test_str, source_location loc)
@@ -240,6 +243,8 @@ class package_t
     const string& name() const { return m_name; }
     size_t size() const { return accumulate(m_sub_pkgs.begin(), m_sub_pkgs.end(), size_t { 0 },
                                             [](auto s, const auto& e) { return s + e.size(); }); }
+    size_t size_errors() const { return accumulate(m_sub_pkgs.begin(), m_sub_pkgs.end(), size_t { 0 },
+                                            [](auto s, const auto& e) { return s + e.size_errors(); }); }
 
     // Adiciona novo teste
     void exec_add(test_exec_status status, string test_str, source_location loc)
@@ -321,8 +326,11 @@ class qtest_exec
 
       auto num_testes = accumulate(i.m_pkgs.begin(), i.m_pkgs.end(), size_t { 0 },
                                    [](auto s, const auto& e) { return s + e.size(); });
+      auto num_testes_errors = accumulate(i.m_pkgs.begin(), i.m_pkgs.end(), size_t { 0 },
+                                   [](auto s, const auto& e) { return s + e.size_errors(); });
 
-      cout << num_testes << " test executed in " << i.m_pkgs.size() << " package.\n";
+      cout << num_testes << " test executed in " << i.m_pkgs.size() << " package. ("
+           << num_testes_errors << " errors).\n";
     };
 
     // Mostra qual foi o último teste realizado
@@ -341,9 +349,9 @@ class qtest_exec
 // Test API 
 namespace nes::test {
 
-  void qtest::exec_add(bool ok, string test_str, source_location l)
+  void qtest::exec_add(test_exec_status st, string test_str, source_location l)
   {
-    qtest_exec::exec_add(ok ? test_exec_status::ok : test_exec_status::err, move(test_str), move(l));
+    qtest_exec::exec_add(st, move(test_str), move(l));
   }
 
   void qtest::package(string name)
