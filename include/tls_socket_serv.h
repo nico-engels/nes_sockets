@@ -33,8 +33,8 @@ namespace nes::net {
 
     unsigned ipv4_port() const;
 
-    const std::string& caminho_chave_pub() const;
-    const std::string& caminho_chave_priv() const;
+    const std::string& public_key_path() const;
+    const std::string& private_key_path() const;
 
     bool is_listening() const;
     bool has_client();
