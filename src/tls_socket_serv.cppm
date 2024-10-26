@@ -44,8 +44,8 @@ export namespace nes::net {
 
     unsigned ipv4_port() const;
 
-    const std::string& caminho_chave_pub() const;
-    const std::string& caminho_chave_priv() const;
+    const std::string& public_key_path() const;
+    const std::string& private_key_path() const;
 
     bool is_listening() const;
     bool has_client();
@@ -125,12 +125,12 @@ namespace nes::net {
     return m_sock.ipv4_port();
   }
 
-  const string& tls_socket_serv::caminho_chave_pub() const
+  const string& tls_socket_serv::public_key_path() const
   {
     return m_pubkey_path;
   }
 
-  const string& tls_socket_serv::caminho_chave_priv() const
+  const string& tls_socket_serv::private_key_path() const
   {
     return m_privkey_path;
   }
