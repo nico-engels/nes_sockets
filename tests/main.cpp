@@ -1,16 +1,18 @@
+import byte_op;
+import nes_exc;
+import net_exc;
+import qtest;
+import socket;
+import socket_serv;
+import tls_socket;
+import tls_socket_serv;
+
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <random>
 #include <thread>
-#include "byte_op.h"
-#include "nes_exc.h"
-#include "net_exc.h"
-#include "qtest.h"
-#include "socket.h"
-#include "socket_serv.h"
-#include "tls_socket.h"
-#include "tls_socket_serv.h"
+
 using namespace std;
 using namespace std::chrono_literals;
 using namespace std::filesystem;

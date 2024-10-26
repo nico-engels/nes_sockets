@@ -1,18 +1,20 @@
-#include <algorithm>
-#include <charconv>
-#include <chrono>
-#include <cstddef>
+import <algorithm>;
+import <charconv>;
+import <chrono>;
+import <cstddef>;
+import <iostream>;
+import <ranges>;
+import <stdexcept>;
+import <string>;
+import <span>;
+import <thread>;
+import <vector>;
+
 #include <format>
-#include <iostream>
 #include <print>
-#include <ranges>
-#include <stdexcept>
-#include <string>
-#include <span>
-#include <thread>
-#include <vector>
-#include "socket.h"
-#include "socket_serv.h"
+
+import socket;
+import socket_serv;
 using namespace std;
 using namespace std::chrono_literals;
 using namespace nes::net;

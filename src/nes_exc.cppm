@@ -1,10 +1,18 @@
-#ifndef NES__NES_EXC_H
-#define NES__NES_EXC_H
+#ifndef __clang__
+module;
 
 #include <format>
-#include <stdexcept>
+#endif
+export module nes_exc;
 
-namespace nes {
+#ifdef __clang__
+import <format>;
+#endif
+import <stdexcept>;
+import <string_view>;
+import <string>;
+
+export namespace nes {
 
   class nes_exc : public std::runtime_error
   { 
@@ -19,6 +27,3 @@ namespace nes {
   };
 
 }
-
-#endif
-// NES__NES_EXC_H

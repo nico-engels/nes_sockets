@@ -1,11 +1,44 @@
-#include "byte_op.h"
+export module byte_op;
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <iterator>
-#include <stdexcept>
-#include "nes_exc.h"
+import <algorithm>;
+import <array>;
+import <bit>;
+import <cstddef>;
+import <cstdint>;
+import <iterator>;
+import <span>;
+import <stdexcept>;
+import <string>;
+import <string_view>;
+import <type_traits>;
+import <vector>;
+import nes_exc;
+
+// Declaração
+export namespace nes {
+
+  // Base64 Converter based on RFC 4648
+  std::string to_base64(std::span<const std::byte>, bool = true, bool = true);
+  std::string to_base64(std::string_view, bool = true, bool = true);
+
+  std::vector<std::byte> base64_to(std::string_view, bool = true);
+
+  // Binary Converter to integral types
+  template <class T>
+    requires std::is_integral_v<T>
+  std::array<std::byte, sizeof(T)> to_bin_arr(const T&, std::endian = std::endian::native);
+
+  template <class T>
+    requires std::is_integral_v<T>
+  T bin_arr_to(const std::array<std::byte, sizeof(T)>&, std::endian = std::endian::native);
+
+  // Transform from byte to string
+  std::string_view bin_to_strv(std::span<const std::byte>);
+  std::string bin_to_str(std::span<const std::byte>);
+  std::span<const std::byte> strv_to_bin(std::string_view);
+}
+
+// Implementação
 using namespace std;
 namespace rng = std::ranges;
 

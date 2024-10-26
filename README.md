@@ -4,6 +4,15 @@ Simple socket and secure socket in modern C++.
 
 Non-blocking implementation of sockets for Windows and Linux for sequencial (not asynchronous) programming.
 
+# Branch using Modules
+
+This branch is experimental using the new C++20 modules system. It will use the modules in repo files and
+the standard library using header units.
+
+Currently (oct'24) the C++23 `import std` does not work with gcc and clang.
+
+CMake also does not support header units. So it will use a bash script for building.
+
 # Requisites
 
 - C++20

@@ -1,13 +1,12 @@
-#ifndef NES_SO__UNIX_SOCKET_H
-#define NES_SO__UNIX_SOCKET_H
+export module unix_socket;
 
-#include <cstddef>
-#include <optional>
-#include <span>
-#include <string>
-#include <vector>
+import <cstddef>;
+import <optional>;
+import <span>;
+import <string>;
+import <vector>;
 
-namespace nes::so {
+export namespace nes::so {
 
   class unix_socket final
   {
@@ -57,6 +56,3 @@ namespace nes::so {
   };
 
 }
-
-#endif
-// NES_SO__UNIX_SOCKET_H

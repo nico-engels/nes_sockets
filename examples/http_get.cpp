@@ -1,14 +1,14 @@
-#include <cctype>
-#include <chrono>
-#include <iomanip>
-#include <iostream>
-#include <string>
-#include <string_view>
-#include <thread>
-#include "socket.h"
-#include "socket_serv.h"
-#include "tls_socket.h"
-#include "tls_socket_serv.h"
+import <cctype>;
+import <chrono>;
+import <iomanip>;
+import <iostream>;
+import <string>;
+import <string_view>;
+import <thread>;
+import socket;
+import socket_serv;
+import tls_socket;
+import tls_socket_serv;
 using namespace std;
 using namespace std::chrono_literals;
 using namespace std::this_thread;

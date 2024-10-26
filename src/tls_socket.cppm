@@ -1,56 +1,142 @@
-#include "tls_socket.h"
+module;
 
-#include <atomic>
-#include <chrono>
-#include <mutex>
-#include <thread>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include "cfg.h"
-#include "nes_exc.h"
-#include "socket_util.h"
-using namespace std;
-using namespace std::chrono;
-using namespace std::chrono_literals;
-using namespace nes;
 
-namespace nes::net {
+export module tls_socket;
+
+import <atomic>;
+import <chrono>;
+import <cstddef>;
+import <mutex>;
+import <span>;
+import <string>;
+import <string_view>;
+import <thread>;
+import <vector>;
+import cfg;
+import nes_exc;
+import socket;
+import socket_util;
+
+// Declaração
+export namespace nes::net {
+
+  class tls_socket final
+  {
+    // Socket and OpenSSL handler
+    socket m_sock;
+    SSL* m_sock_ssl { nullptr };
+
+    // TLS Handshake state
+    enum class handshake_state { connect, accept, ok };
+    handshake_state m_handshake { handshake_state::connect };
+    void handshake();
+
+  public:
+    tls_socket();
+    tls_socket(SSL*, socket);
+
+    // Constructor (Host, port)
+    tls_socket(std::string, unsigned);
+
+    ~tls_socket();
+
+    tls_socket(const tls_socket&) = delete;
+    tls_socket(tls_socket&&);
+
+    const tls_socket& operator=(const tls_socket&) const = delete;
+    tls_socket& operator=(tls_socket&&);
+
+    // Connection (Host, port)
+    void connect(std::string, unsigned);
+    void disconnect();
+
+    // TLS Extensions
+    // Virtual host (same host many sites)
+    void tls_ext_host_name(std::string);
+
+    // IPv4 Connection Data
+    const std::string& ipv4_address() const;
+    unsigned ipv4_port() const;
+    bool is_connected() const;
+
+    std::string cipher() const;
+    std::string tls_protocol() const;
+
+    // I/O basic functions (binary or binary char)
+    void send(std::span<const std::byte>);
+    void send(std::string_view);
+    [[nodiscard]] std::vector<std::byte> receive();
+
+    // I/O basic utilities
+    // Where exists the time_expire and/or max_size are used as maximum threasholds
+    // Spin receiving data until finds the delim arg, return the data and pos of delim in data
+    template <class R, class P = std::ratio<1>>
+    [[nodiscard]] std::pair<std::vector<std::byte>, std::size_t>
+    receive_until_delimiter(std::span<const std::byte> delim, std::chrono::duration<R, P> time_expire,
+      std::size_t max_size);
+
+    // Read data until receive the exact_size number of bytes
+    template <class R, class P = std::ratio<1>>
+    [[nodiscard]] std::vector<std::byte> receive_until_size(std::size_t exact_size,
+      std::chrono::duration<R, P> time_expire);
+
+    // Read data until receive the >= at_least_size bytes
+    template <class R, class P = std::ratio<1>>
+    [[nodiscard]] std::vector<std::byte> receive_at_least(std::size_t at_least_size,
+      std::chrono::duration<R, P> time_expire);
+
+    // Complete the data arg until the data.size() is equals arg total_size
+    template <class R, class P>
+    void receive_remaining(std::vector<std::byte>& data, size_t total_size, std::chrono::duration<R, P> time_expire);
+
+    // Make manual TLS handshake (auxiliary function same thread connection)
+    friend void same_thread_handshake(tls_socket&, tls_socket&);
+  };
 
   // Init/Destroy flag
-  once_flag init_lib;
+  std::once_flag init_lib;
   void initialize_OpenSSL();
 
   SSL_CTX *openssl_ctx();
   void openssl_ctx_free();
 
   // Aux RAII temporary handle
-  namespace {
-    class sockssl_rai final
-    {
-      SSL *m_sock_ssl { nullptr };
+  class sockssl_rai final
+  {
+    SSL *m_sock_ssl { nullptr };
 
-    public:
-      sockssl_rai(SSL* sock) : m_sock_ssl { sock } {};
-      ~sockssl_rai() { if (m_sock_ssl) SSL_free(m_sock_ssl); };
+  public:
+    sockssl_rai(SSL* sock) : m_sock_ssl { sock } {};
+    ~sockssl_rai() { if (m_sock_ssl) SSL_free(m_sock_ssl); };
 
-      sockssl_rai(const sockssl_rai&) = delete;
+    sockssl_rai(const sockssl_rai&) = delete;
 
-      SSL* handle() { return m_sock_ssl; };
-      SSL* release() { SSL *ret = m_sock_ssl; m_sock_ssl = nullptr; return ret; };
-    };
+    SSL* handle() { return m_sock_ssl; };
+    SSL* release() { SSL *ret = m_sock_ssl; m_sock_ssl = nullptr; return ret; };
+  };
 
-    class ctxssl_ini final
-    {
-      bool m_is_init { false };
-    public:
-      ctxssl_ini() { openssl_ctx(); }
+  class ctxssl_ini final
+  {
+    bool m_is_init { false };
+  public:
+    ctxssl_ini() { openssl_ctx(); }
 
-      ~ctxssl_ini() { if (!m_is_init) openssl_ctx_free(); }
+    ~ctxssl_ini() { if (!m_is_init) openssl_ctx_free(); }
 
-      void set_initialized() { m_is_init = true; };
-    };
-  }
+    void set_initialized() { m_is_init = true; };
+  };
+}
+
+// Definição
+using namespace std;
+using namespace std::chrono;
+using namespace std::chrono_literals;
+using namespace nes;
+
+namespace nes::net {
 
   tls_socket::tls_socket()
   {
@@ -452,14 +538,5 @@ namespace nes::net {
     if (!--openssl_ctx_contador)
       SSL_CTX_free(openssl_ctxe);
   }
-
-  // Template instantiations (at end to work with gcc and clang)
-  template pair<vector<std::byte>, size_t> tls_socket::receive_until_delimiter(span<const std::byte>, seconds, size_t);
-  template pair<vector<std::byte>, size_t>
-  tls_socket::receive_until_delimiter(span<const std::byte>, milliseconds, size_t);
-  template vector<std::byte> tls_socket::receive_until_size(size_t, seconds);
-  template vector<std::byte> tls_socket::receive_until_size(size_t, milliseconds);
-  template vector<std::byte> tls_socket::receive_at_least(size_t, seconds);
-  template void tls_socket::receive_remaining(vector<std::byte>&, size_t, seconds);
 
 }

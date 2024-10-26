@@ -1,53 +1,65 @@
-#include "tls_socket_serv.h"
+module;
 
-#include <atomic>
-#include <chrono>
-#include <mutex>
-#include <thread>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include "nes_exc.h"
+
+export module tls_socket_serv;
+
+import <atomic>;
+import <chrono>;
+import <mutex>;
+import <optional>;
+import <thread>;
+import socket_serv;
+import nes_exc;
+import tls_socket;
+
+// Declaration
+export namespace nes::net {
+
+  class tls_socket_serv final
+  {
+    // SO Native Socket Server
+    socket_serv m_sock;
+
+    // Public/Private Key Pair Path
+    std::string m_pubkey_path;
+    std::string m_privkey_path;
+
+  public:
+    tls_socket_serv();
+    tls_socket_serv(unsigned, std::string, std::string);
+
+    tls_socket_serv(tls_socket_serv&&);
+    tls_socket_serv& operator=(tls_socket_serv&&);
+
+    tls_socket_serv(const tls_socket_serv&) = delete;
+    const tls_socket_serv& operator=(const tls_socket_serv&) = delete;
+
+    ~tls_socket_serv();
+
+    // Put the sock on non-block listening (Ipv4 Port, Public Key Path, Private Key Path)
+    void listen(unsigned, std::string, std::string);
+
+    unsigned ipv4_port() const;
+
+    const std::string& caminho_chave_pub() const;
+    const std::string& caminho_chave_priv() const;
+
+    bool is_listening() const;
+    bool has_client();
+
+    std::optional<tls_socket> accept();
+  };
+}
+
+// Implementation
 using namespace std;
 using namespace std::chrono_literals;
 using namespace nes;
 
 namespace nes::net {
-
-   // Init/Destroy flag (definied in tls_socket)
-  extern once_flag init_lib;
-  void initialize_OpenSSL();
-
-  SSL_CTX *openssl_ctx();
-  void openssl_ctx_free();
-
-  // Aux RAII temporary handle
-  namespace {
-    class sockssl_rai final
-    {
-      SSL *m_sock_ssl { nullptr };
-
-    public:
-      sockssl_rai(SSL* sock) : m_sock_ssl { sock } {};
-      ~sockssl_rai() { if (m_sock_ssl) SSL_free(m_sock_ssl); };
-
-      sockssl_rai(const sockssl_rai&) = delete;
-
-      SSL* handle() { return m_sock_ssl; };
-      SSL* release() { SSL *ret = m_sock_ssl; m_sock_ssl = nullptr; return ret; };
-    };
-
-    class ctxssl_ini final
-    {
-      bool m_is_init { false };
-    public:
-      ctxssl_ini() { openssl_ctx(); }
-
-      ~ctxssl_ini() { if (!m_is_init) openssl_ctx_free(); }
-
-      void set_initialized() { m_is_init = true; };
-    };
-  }
 
   tls_socket_serv::tls_socket_serv()
   {
