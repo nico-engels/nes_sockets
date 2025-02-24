@@ -26,10 +26,11 @@ namespace nes::net {
     void handshake();
 
   public:
+    // Constructor 
     tls_socket();
     tls_socket(SSL*, socket);
 
-    // Constructor (Host, port)
+    // (Host, port)
     tls_socket(std::string, unsigned);
 
     ~tls_socket();

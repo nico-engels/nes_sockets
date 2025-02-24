@@ -110,9 +110,9 @@ namespace nes::net {
       throw nes_exc { "TLS-Socket already configured." };
 
     // First create the native socket, the tls protocol is layered
-    socket s (move(addr), port);
+    socket s(move(addr), port);
 
-    // OpenSSL hangler
+    // OpenSSL handler
     SSL *sock_ssl = SSL_new(openssl_ctx());
     if (!sock_ssl)
       throw nes_exc { "Not possible alocate the OpenSSL client context." };
@@ -182,15 +182,15 @@ namespace nes::net {
           }
           default:
           {
-            vector<decltype(errcode)> erros;
+            vector<decltype(errcode)> errors;
             string msg = "Error while making the handshake!\n";
-            erros.push_back(errcode);
+            errors.push_back(errcode);
 
             // Collect all the errors and create the error message
             while ((errcode = static_cast<decltype(errcode)>(ERR_get_error())) != 0)
-              erros.push_back(errcode);
+            errors.push_back(errcode);
 
-            for (const auto erro : erros)
+            for (const auto erro : errors)
               msg += to_string(erro) + " " + ERR_error_string(static_cast<unsigned long>(erro), NULL);
 
             throw nes_exc { msg };
@@ -429,17 +429,17 @@ namespace nes::net {
     SSL_library_init();
   }
 
-  static atomic<unsigned> openssl_ctx_contador { 0 };
+  static atomic<unsigned> openssl_ctx_counter { 0 };
   static SSL_CTX *openssl_ctxe { nullptr };
 
   SSL_CTX *openssl_ctx()
   {
-    if (openssl_ctx_contador++ == 0)
+    if (openssl_ctx_counter++ == 0)
     {
       openssl_ctxe = SSL_CTX_new(TLS_method());
       if (!openssl_ctxe)
       {
-        --openssl_ctx_contador;
+        --openssl_ctx_counter;
         throw nes_exc { "Fail to alocate global OpenSSL context." };
       }
     }
@@ -449,12 +449,14 @@ namespace nes::net {
 
   void openssl_ctx_free()
   {
-    if (!--openssl_ctx_contador)
+    if (!--openssl_ctx_counter)
       SSL_CTX_free(openssl_ctxe);
   }
 
   // Template instantiations (at end to work with gcc and clang)
   template pair<vector<std::byte>, size_t> tls_socket::receive_until_delimiter(span<const std::byte>, seconds, size_t);
+  template pair<vector<std::byte>, size_t>
+  tls_socket::receive_until_delimiter(span<const std::byte>, milliseconds, size_t);
   template pair<vector<std::byte>, size_t>
   tls_socket::receive_until_delimiter(span<const std::byte>, milliseconds, size_t);
   template vector<std::byte> tls_socket::receive_until_size(size_t, seconds);
