@@ -14,7 +14,7 @@ using namespace nes;
 
 namespace nes::net {
 
-   // Init/Destroy flag (definied in tls_socket)
+  // Init/Destroy flag (definied in tls_socket)
   extern once_flag init_lib;
   void initialize_OpenSSL();
 

@@ -52,7 +52,7 @@ namespace nes::so {
     // Aux RAII addrinfo
     class addrinfo_raii {
       addrinfo* m_handle;
-     public:
+    public:
       addrinfo_raii(addrinfo* handle) : m_handle { handle } {};
       ~addrinfo_raii() { if (m_handle) freeaddrinfo(m_handle); };
     };
@@ -309,9 +309,6 @@ namespace nes::so {
     if (!this->is_connected())
       throw nes_exc { "Socket is not connected, cannot send data." };
 
-    if (data_span.size() == 0)
-      return;
-
     // Send the data in cfg::net::packet_size chunks
     size_t retry_count = 0;
     auto interval = cfg::net::wait_io_step_min;
@@ -345,7 +342,6 @@ namespace nes::so {
       // Shrink the span
       data_span = data_span.last(data_span.size() - chunk_size);
     }
-
   }
 
   vector<std::byte> win_socket::receive()

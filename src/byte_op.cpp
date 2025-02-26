@@ -6,6 +6,7 @@
 #include <iterator>
 #include <stdexcept>
 #include "nes_exc.h"
+
 using namespace std;
 namespace rng = std::ranges;
 
@@ -315,7 +316,7 @@ namespace nes {
 
   string bin_to_str(span<const byte> bin)
   {
-    // Convert from a byte view to a char view
+    // Convert from a byte view to a char string
     return { reinterpret_cast<const char*>(bin.data()), bin.size() };
   }
 

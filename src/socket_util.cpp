@@ -32,7 +32,7 @@ namespace nes::net {
 
     // Read data until receive the deliminator
     // The time e size params sets the threasholds for the reading
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
     milliseconds interval = cfg::net::wait_io_step_min;
     size_t retry_count = 0;
     while (steady_clock::now() - start < time_expire)
@@ -72,7 +72,7 @@ namespace nes::net {
     vector<byte> ret;
 
     // Read data until receive the exact number of bytes
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
     milliseconds interval = cfg::net::wait_io_step_min;
     size_t retry_count = 0;
     while (steady_clock::now() - start < time_expire)
@@ -112,7 +112,7 @@ namespace nes::net {
     vector<byte> ret;
 
     // Read data until receive the al least some number of bytes
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
     milliseconds interval = cfg::net::wait_io_step_min;
     size_t retry_count = 0;
     while (steady_clock::now() - start < time_expire)
@@ -156,6 +156,7 @@ namespace nes::net {
   // Template instantiations (at end to work with gcc and clang)
   template pair<vector<byte>, size_t> receive_until_delimiter(socket&, span<const byte>, seconds, size_t);
   template pair<vector<byte>, size_t> receive_until_delimiter(socket&, span<const byte>, milliseconds, size_t);
+  template pair<vector<byte>, size_t> receive_until_delimiter(socket&, span<const byte>, duration<double>, size_t);
   template vector<byte> receive_until_size(socket&, size_t, seconds);
   template vector<byte> receive_until_size(socket&, size_t, milliseconds);
   template vector<byte> receive_at_least(socket&, size_t, seconds);
@@ -163,6 +164,7 @@ namespace nes::net {
 
   template pair<vector<byte>, size_t> receive_until_delimiter(tls_socket&, span<const byte>, seconds, size_t);
   template pair<vector<byte>, size_t> receive_until_delimiter(tls_socket&, span<const byte>, milliseconds, size_t);
+  template pair<vector<byte>, size_t> receive_until_delimiter(tls_socket&, span<const byte>, duration<double>, size_t);
   template vector<byte> receive_until_size(tls_socket&, size_t, seconds);
   template vector<byte> receive_until_size(tls_socket&, size_t, milliseconds);
   template vector<byte> receive_at_least(tls_socket&, size_t, seconds);

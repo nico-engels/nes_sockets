@@ -120,6 +120,8 @@ namespace nes::net {
   socket_tmpl<socket_so_impl>::receive_until_delimiter(span<const byte>, seconds, size_t);
   template pair<vector<byte>, size_t>
   socket_tmpl<socket_so_impl>::receive_until_delimiter(span<const byte>, milliseconds, size_t);
+  template pair<vector<byte>, size_t> 
+  socket_tmpl<socket_so_impl>::receive_until_delimiter(span<const byte>, duration<double>, size_t);
   template vector<byte> socket_tmpl<socket_so_impl>::receive_until_size(size_t, seconds);
   template vector<byte> socket_tmpl<socket_so_impl>::receive_until_size(size_t, milliseconds);
   template vector<byte> socket_tmpl<socket_so_impl>::receive_at_least(size_t, seconds);
