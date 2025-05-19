@@ -7,15 +7,13 @@ Non-blocking implementation of sockets for Windows and Linux for sequencial (not
 # Branch using Modules
 
 This branch is experimental using the new C++20 modules system. It will use the modules in repo files and
-the standard library using header units.
+the standard library using module `std`.
 
-Currently (oct'24) the C++23 `import std` does not work with gcc and clang.
-
-CMake also does not support header units. So it will use a bash script for building.
+CMake support WIP. Until then it will use a bash script for building.
 
 # Requisites
 
-- C++20
+- C++23
 
 - OpenSSL Library
 
