@@ -36,7 +36,7 @@ export namespace nes::net {
 
     ~tls_socket_serv();
 
-    // Put the sock on non-block listening (Ipv4 Port, Public Key Path, Private Key Path)
+    // Non-block listening (Ipv4 Port, Public Key Path, Private Key Path)
     void listen(unsigned, std::string, std::string);
 
     unsigned ipv4_port() const;

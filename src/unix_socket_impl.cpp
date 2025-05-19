@@ -259,9 +259,6 @@ namespace nes::so {
     if (!this->is_connected())
       throw nes_exc { "Socket is not connected, cannot send data." };
 
-    if (data_span.size() == 0)
-      return;
-
     // Send the data in cfg::net::packet_size chunks
     size_t retry_count = 0;
     auto interval = cfg::net::wait_io_step_min;

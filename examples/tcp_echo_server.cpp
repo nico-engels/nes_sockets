@@ -86,6 +86,7 @@ try {
           println("* client {}:{} sends {} bytes of data:", cli.ipv4_address(), cli.ipv4_port(), data.size());
           print_hex_view(data);
           cli.send(data);
+          println("* client {}:{} echoed back {} bytes of data.", cli.ipv4_address(), cli.ipv4_port(), data.size());
           received_event = true;
         }
       } catch (...) {

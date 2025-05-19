@@ -10,11 +10,7 @@ export namespace nes::test {
     template <class T, class U>
     std::string print_values_test(T&& lhs, U&& rhs)
     {
-      std::ostringstream oss;
-      oss << "lhs: " << std::forward<T>(lhs) << '\n'
-          << "rhs: " << std::forward<U>(rhs) << '\n';
-
-      return oss.str();
+      return std::format("lhs: {}\nrhs: {}\n", std::forward<T>(lhs), std::forward<U>(rhs));
     }
 
     template <class T>
@@ -23,15 +19,26 @@ export namespace nes::test {
     };
 
     template <class T, class U>
-      requires (!Streamable<T> || !Streamable<U>)
+      requires (!Streamable<T> && !Streamable<U>)
     std::string print_values_test(T&&, U&&)
     {
-      std::ostringstream oss;
-      oss << "lhs: [no representation]\n"
-          << "rhs: [no representation]\n";
-
-      return oss.str();
+      return "lhs: [no representation]\nrhs: [no representation]\n";
     }
+
+    template <class T, class U>
+      requires (Streamable<T> && !Streamable<U>)
+    std::string print_values_test(T&& lhs, U&&)
+    {
+      return std::format("lhs: {}\nrhs: [no representation]\n", std::forward<T>(lhs));
+    }
+
+    template <class T, class U>
+      requires (!Streamable<T> && Streamable<U>)
+    std::string print_values_test(T&&, U&& rhs)
+    {
+      return std::format("lhs: [no representation]\nrhs: {}\n", std::forward<U>(rhs));
+    }
+
 
   }
 
@@ -302,27 +309,27 @@ class sub_package_title_t
 
     void print_summary(print_options po) const
     {
-      cout << "Test " << m_title << "\n\n";
+      print("Test {}\n\n", m_title);
 
       int max_w = static_cast<int>(log10(m_execs.size())) + 1;
       for (size_t i = 0; i < m_execs.size(); i++) {
         if (po == print_options::all)
-          cout << setw(max_w) << i + 1 << ": " << m_execs[i].str() << "\n";
+          println("{:{}}: {}", i + 1, max_w, m_execs[i].str());
         else if (po == print_options::only_errors && m_execs[i].status() != test_exec_status::ok)
-          cout << setw(max_w) << i + 1 << ": " << m_execs[i].str() << "\n";
+          println("{:{}}: {}", i + 1, max_w, m_execs[i].str());
       }
-      cout << '\n';
+      println();
     }
 
     void print_last() const
     {
       if (!m_title.empty())
-      cout << "Test " << m_title << "\n";
+      print("Test {}\n", m_title);
 
       if (!m_execs.empty())
-        cout << "Localization: " << m_execs.back().loc_str() << "\n";
+      println("Localization: {}",  m_execs.back().loc_str());
       else
-        cout << "No test executed\n";
+        println("No test executed");
     }
 };
 
@@ -363,7 +370,7 @@ class sub_package_t
       if (!this->empty_summary(po))
       {
         if (!m_name.empty())
-          cout << "### Test " << m_name << " ###\n\n";
+          print("### Test {} ###\n\n", m_name);
 
         for (const auto& spt : m_sub_pkgs_titles)
           if(!spt.empty_summary(po))
@@ -374,12 +381,12 @@ class sub_package_t
     void print_last() const
     {
       if (!m_name.empty())
-        cout << "### Test " << m_name << " ###\n";
+        println("### Test {} ###", m_name);
 
       if (!m_sub_pkgs_titles.empty())
         m_sub_pkgs_titles.back().print_last();
       else
-        cout << "no subtitle executed\n";
+        println("no subtitle executed");
     }
 };
 
@@ -420,7 +427,7 @@ class package_t
       if (!this->empty_summary(po))
       {
         if (!m_name.empty())
-          cout << "--- Package " << m_name << " ---\n\n";
+          print("--- Package {} ---\n\n", m_name);
 
         for (const auto& sp : m_sub_pkgs)
           if (!sp.empty_summary(po))
@@ -431,12 +438,12 @@ class package_t
     void print_last() const
     {
       if (!m_name.empty())
-        cout << "--- Package " << m_name << " ---\n";
+        println("--- Package {} ---", m_name);
 
       if (!m_sub_pkgs.empty())
         m_sub_pkgs.back().print_last();
       else
-        cout << "no subpackage executed\n";
+        println("no subpackage executed");
     }
 };
 
@@ -471,7 +478,7 @@ class qtest_exec
     static void print_summary(print_options po)
     {
       auto& i = inst();
-      cout << "### Test Summary ###\n";
+      println("### Test Summary ###");
 
       for (const auto& pkg : i.m_pkgs)
         pkg.print_summary(po);
@@ -481,20 +488,19 @@ class qtest_exec
       auto num_testes_errors = accumulate(i.m_pkgs.begin(), i.m_pkgs.end(), size_t { 0 },
                                    [](auto s, const auto& e) { return s + e.size_errors(); });
 
-      cout << num_testes << " test executed in " << i.m_pkgs.size() << " package. ("
-           << num_testes_errors << " errors).\n";
+      println("{} test executed in {} package ({} errors).", num_testes, i.m_pkgs.size(), num_testes_errors);       
     };
 
     // Mostra qual foi o último teste realizado
     static void print_last()
     {
       auto& i = inst();
-      cout << "### Last executed test ###\n";
+      println("### Last executed test ###");
 
       if (!i.m_pkgs.empty())
         i.m_pkgs.back().print_last();
       else
-        cout << "no package executed\n";
+        println("no package executed");
     };
 };
 

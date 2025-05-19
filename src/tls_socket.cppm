@@ -28,10 +28,11 @@ export namespace nes::net {
     void handshake();
 
   public:
+    // Constructor
     tls_socket();
     tls_socket(SSL*, socket);
 
-    // Constructor (Host, port)
+    // (Host, port)
     tls_socket(std::string, unsigned);
 
     ~tls_socket();
@@ -83,7 +84,7 @@ export namespace nes::net {
 
     // Complete the data arg until the data.size() is equals arg total_size
     template <class R, class P>
-    void receive_remaining(std::vector<std::byte>& data, size_t total_size, std::chrono::duration<R, P> time_expire);
+    void receive_remaining(std::vector<std::byte>& data, std::size_t total_size, std::chrono::duration<R, P> time_expire);
 
     // Make manual TLS handshake (auxiliary function same thread connection)
     friend void same_thread_handshake(tls_socket&, tls_socket&);
@@ -189,9 +190,9 @@ namespace nes::net {
       throw nes_exc { "TLS-Socket already configured." };
 
     // First create the native socket, the tls protocol is layered
-    socket s (move(addr), port);
+    socket s(move(addr), port);
 
-    // OpenSSL hangler
+    // OpenSSL handler
     SSL *sock_ssl = SSL_new(openssl_ctx());
     if (!sock_ssl)
       throw nes_exc { "Not possible alocate the OpenSSL client context." };
@@ -261,15 +262,15 @@ namespace nes::net {
           }
           default:
           {
-            vector<decltype(errcode)> erros;
+            vector<decltype(errcode)> errors;
             string msg = "Error while making the handshake!\n";
-            erros.push_back(errcode);
+            errors.push_back(errcode);
 
             // Collect all the errors and create the error message
             while ((errcode = static_cast<decltype(errcode)>(ERR_get_error())) != 0)
-              erros.push_back(errcode);
+            errors.push_back(errcode);
 
-            for (const auto erro : erros)
+            for (const auto erro : errors)
               msg += to_string(erro) + " " + ERR_error_string(static_cast<unsigned long>(erro), NULL);
 
             throw nes_exc { msg };
@@ -319,7 +320,7 @@ namespace nes::net {
       return string {};
   }
 
-  void tls_socket::send(span<const std::byte> data_span)
+  void tls_socket::send(span<const byte> data_span)
   {
     if (!m_sock.is_connected())
       throw nes_exc { "The TLS socket is not connected." };
@@ -366,7 +367,7 @@ namespace nes::net {
     this->send(as_bytes(span { data_str.begin(), data_str.end() }));
   }
 
-  vector<std::byte> tls_socket::receive()
+  vector<byte> tls_socket::receive()
   {
     if (!m_sock.is_connected())
       throw nes_exc { "The TLS socket is not connected." };
@@ -374,8 +375,8 @@ namespace nes::net {
     if (m_handshake != handshake_state::ok)
       this->handshake();
 
-    array<std::byte, cfg::net::packet_size> packet_buffer;
-    vector<std::byte> ret;
+    array<byte, cfg::net::packet_size> packet_buffer;
+    vector<byte> ret;
 
     while (true)
     {
@@ -410,29 +411,29 @@ namespace nes::net {
   }
 
   template <class R, class P>
-  pair<vector<std::byte>, size_t>
-  tls_socket::receive_until_delimiter(span<const std::byte> delim, duration<R, P> time_expire, size_t max_size)
+  pair<vector<byte>, size_t>
+  tls_socket::receive_until_delimiter(span<const byte> delim, duration<R, P> time_expire, size_t max_size)
   {
     using nes::net::receive_until_delimiter;
     return receive_until_delimiter(*this, delim, time_expire, max_size);
   }
 
   template <class R, class P>
-  vector<std::byte> tls_socket::receive_until_size(size_t exact_size, duration<R, P> time_expire)
+  vector<byte> tls_socket::receive_until_size(size_t exact_size, duration<R, P> time_expire)
   {
     using nes::net::receive_until_size;
     return receive_until_size(*this, exact_size, time_expire);
   }
 
   template <class R, class P>
-  vector<std::byte> tls_socket::receive_at_least(size_t at_least_size, duration<R, P> time_expire)
+  vector<byte> tls_socket::receive_at_least(size_t at_least_size, duration<R, P> time_expire)
   {
     using nes::net::receive_at_least;
     return receive_at_least(*this, at_least_size, time_expire);
   }
 
   template <class R, class P>
-  void tls_socket::receive_remaining(vector<std::byte>& data, size_t total_size, duration<R, P> time_expire)
+  void tls_socket::receive_remaining(vector<byte>& data, size_t total_size, duration<R, P> time_expire)
   {
     using nes::net::receive_remaining;
     receive_remaining(*this, data, total_size, time_expire);
@@ -508,17 +509,17 @@ namespace nes::net {
     SSL_library_init();
   }
 
-  static atomic<unsigned> openssl_ctx_contador { 0 };
+  static atomic<unsigned> openssl_ctx_counter { 0 };
   static SSL_CTX *openssl_ctxe { nullptr };
 
   SSL_CTX *openssl_ctx()
   {
-    if (openssl_ctx_contador++ == 0)
+    if (openssl_ctx_counter++ == 0)
     {
       openssl_ctxe = SSL_CTX_new(TLS_method());
       if (!openssl_ctxe)
       {
-        --openssl_ctx_contador;
+        --openssl_ctx_counter;
         throw nes_exc { "Fail to alocate global OpenSSL context." };
       }
     }
@@ -528,7 +529,7 @@ namespace nes::net {
 
   void openssl_ctx_free()
   {
-    if (!--openssl_ctx_contador)
+    if (!--openssl_ctx_counter)
       SSL_CTX_free(openssl_ctxe);
   }
 

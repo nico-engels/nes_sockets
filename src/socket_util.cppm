@@ -12,7 +12,7 @@ export namespace nes::net {
   // Where 0 == tries == wait_io_step_min and tries == io_max_retry == wait_io_step_max
   std::chrono::milliseconds calculate_interval_retry(std::size_t);
 
-  // Input Commom algorithms normal and secure socket
+  // Input Commom algorithms for normal and secure socket
   template <class S, class R, class P = std::ratio<1>>
   std::pair<std::vector<std::byte>, std::size_t>
   receive_until_delimiter(S&, std::span<const std::byte>, std::chrono::duration<R, P>, std::size_t);
@@ -54,7 +54,7 @@ namespace nes::net {
 
     // Read data until receive the deliminator
     // The time e size params sets the threasholds for the reading
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
     milliseconds interval = cfg::net::wait_io_step_min;
     size_t retry_count = 0;
     while (steady_clock::now() - start < time_expire)
@@ -94,7 +94,7 @@ namespace nes::net {
     vector<byte> ret;
 
     // Read data until receive the exact number of bytes
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
     milliseconds interval = cfg::net::wait_io_step_min;
     size_t retry_count = 0;
     while (steady_clock::now() - start < time_expire)
@@ -134,7 +134,7 @@ namespace nes::net {
     vector<byte> ret;
 
     // Read data until receive the al least some number of bytes
-    auto start = steady_clock::now();
+    const auto start = steady_clock::now();
     milliseconds interval = cfg::net::wait_io_step_min;
     size_t retry_count = 0;
     while (steady_clock::now() - start < time_expire)

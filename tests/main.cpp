@@ -27,8 +27,8 @@ try {
     // The test suite needs to be in the root folder nes_socket
     set_default_directory();
 
-    cout << "Automated Test Suite\n"
-         << "Default path dir: " /*<< current_path()*/ << endl;
+    println("Automated Test Suite\n"
+            "Default path dir: '{}'", current_path().native());
 
     // Test entry points
     qtest::package("nes_sockets");
@@ -39,12 +39,12 @@ try {
     //qtest::print_summary(print_options::all);
 
 } catch (exception& e) {
-    cout << "Error: " << e.what() << "\n\n";
+    println("Error: {}\n", e.what());
     qtest::print_last();
     return 1;
 
 } catch (...) {
-    cout << "Unhandled exception!!!\n\n";
+    println("Unhandled exception!!!\n");
     qtest::print_last();
     return 1;
 
