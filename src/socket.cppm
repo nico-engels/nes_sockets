@@ -1,11 +1,7 @@
 export module socket;
 
-import <chrono>;
-import <span>;
-import <string>;
-import <string_view>;
-import <type_traits>;
-import <vector>;
+import std;
+
 import cfg;
 import socket_util;
 import unix_socket;
@@ -69,7 +65,7 @@ export namespace nes::net {
 
     // Complete the data arg until the data.size() is equals arg total_size
     template <class R, class P>
-    void receive_remaining(std::vector<std::byte>& data, size_t total_size, std::chrono::duration<R, P> time_expire);
+    void receive_remaining(std::vector<std::byte>& data, std::size_t total_size, std::chrono::duration<R, P> time_expire);
   };
 
   using socket_so_impl = std::conditional_t<nes::cfg::so::is_windows, nes::so::win_socket

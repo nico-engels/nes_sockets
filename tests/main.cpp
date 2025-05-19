@@ -1,3 +1,5 @@
+import std;
+
 import byte_op;
 import nes_exc;
 import net_exc;
@@ -6,12 +8,6 @@ import socket;
 import socket_serv;
 import tls_socket;
 import tls_socket_serv;
-
-#include <chrono>
-#include <filesystem>
-#include <iostream>
-#include <random>
-#include <thread>
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -32,7 +28,7 @@ try {
     set_default_directory();
 
     cout << "Automated Test Suite\n"
-         << "Default path dir: " << current_path() << endl;
+         << "Default path dir: " /*<< current_path()*/ << endl;
 
     // Test entry points
     qtest::package("nes_sockets");

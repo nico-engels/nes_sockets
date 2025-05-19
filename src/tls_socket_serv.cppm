@@ -6,11 +6,8 @@ module;
 
 export module tls_socket_serv;
 
-import <atomic>;
-import <chrono>;
-import <mutex>;
-import <optional>;
-import <thread>;
+import std;
+
 import socket_serv;
 import nes_exc;
 import tls_socket;

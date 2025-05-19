@@ -1,11 +1,6 @@
 export module socket_util;
 
-import <algorithm>;
-import <chrono>;
-import <cstddef>;
-import <span>;
-import <vector>;
-import <thread>;
+import std;
 
 import cfg;
 import net_exc;
@@ -29,7 +24,7 @@ export namespace nes::net {
   std::vector<std::byte> receive_at_least(S&, std::size_t, std::chrono::duration<R, P>);
 
   template <class S, class R, class P>
-  void receive_remaining(S&, std::vector<std::byte>&, size_t, std::chrono::duration<R, P>);
+  void receive_remaining(S&, std::vector<std::byte>&, std::size_t, std::chrono::duration<R, P>);
 
 }
 

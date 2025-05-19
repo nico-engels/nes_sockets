@@ -1,10 +1,6 @@
 export module unix_socket;
 
-import <cstddef>;
-import <optional>;
-import <span>;
-import <string>;
-import <vector>;
+import std;
 
 export namespace nes::so {
 

@@ -1,17 +1,6 @@
 export module byte_op;
 
-import <algorithm>;
-import <array>;
-import <bit>;
-import <cstddef>;
-import <cstdint>;
-import <iterator>;
-import <span>;
-import <stdexcept>;
-import <string>;
-import <string_view>;
-import <type_traits>;
-import <vector>;
+import std;
 import nes_exc;
 
 // Declaração

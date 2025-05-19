@@ -1,12 +1,6 @@
 export module win_socket;
 
-import <cstddef>;
-import <cstdint>;
-import <optional>;
-import <span>;
-import <string>;
-import <type_traits>;
-import <vector>;
+import std;
 
 // Evitar a importação
 using UINT_PTR = std::conditional_t<sizeof(void*) == 4, std::uint32_t, std::uint64_t>;

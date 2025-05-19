@@ -1,6 +1,6 @@
 export module cfg;
 
-import <chrono>;
+import std;
 
 export namespace nes::cfg {
 
@@ -10,10 +10,10 @@ export namespace nes::cfg {
      constexpr auto wait_io_step_max = std::chrono::milliseconds { 250 };
 
      // Packet Size
-     constexpr auto packet_size = size_t { 8'192 };
+     constexpr auto packet_size = std::size_t { 8'192 };
 
      // Retries
-     constexpr auto io_max_retry = size_t { 100 };
+     constexpr auto io_max_retry = std::size_t { 100 };
   }
 
   namespace so {

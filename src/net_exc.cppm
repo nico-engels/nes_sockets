@@ -1,6 +1,6 @@
 export module net_exc;
 
-import <stdexcept>;
+import std;
 import nes_exc;
 
 export namespace nes::net {

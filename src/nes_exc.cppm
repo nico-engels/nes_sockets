@@ -1,16 +1,6 @@
-#ifndef __clang__
-module;
-
-#include <format>
-#endif
 export module nes_exc;
 
-#ifdef __clang__
-import <format>;
-#endif
-import <stdexcept>;
-import <string_view>;
-import <string>;
+import std;
 
 export namespace nes {
 

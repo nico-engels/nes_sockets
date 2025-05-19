@@ -3,6 +3,7 @@ module;
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <cerrno>
 #include <fcntl.h>
 #include <netdb.h>
 #include <poll.h>
@@ -10,14 +11,7 @@ module;
 
 module unix_socket;
 
-import <array>;
-import <atomic>;
-import <chrono>;
-import <cstring>;
-import <functional>;
-import <stdexcept>;
-import <string>;
-import <thread>;
+import std;
 
 import cfg;
 import nes_exc;

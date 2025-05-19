@@ -3,37 +3,8 @@ set -e
 
 rm -f ../bin/*
 rm -rf gcm.cache
-#g++-latest -std=c++23 -fmodules-ts -xc++-system-header print
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header filesystem
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header algorithm
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header array
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header atomic
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header bit
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header cctype
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header charconv
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header chrono
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header cmath
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header cstddef
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header cstdint
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header cstring
-#g++-latest -std=c++23 -fmodules-ts -xc++-system-header format
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header functional
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header fstream
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header iterator
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header iomanip
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header iostream
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header mutex
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header numeric
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header optional
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header ranges
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header span
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header sstream
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header stdexcept
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header string
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header string_view
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header thread
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header type_traits
-g++-latest -std=c++23 -fmodules-ts -xc++-system-header vector
+
+g++-latest -Wall -Werror -std=c++23 -fmodules-ts -fsearch-include-path bits/std.cc -c -o ../bin/std.o
 g++-latest -Wall -Werror -std=c++23 -fmodules-ts ../src/cfg.cppm -c -o ../bin/cfg.o
 g++-latest -Wall -Werror -std=c++23 -fmodules-ts ../src/nes_exc.cppm -c -o ../bin/nes_exc.o
 g++-latest -Wall -Werror -std=c++23 -fmodules-ts ../src/net_exc.cppm -c -o ../bin/net_exc.o
@@ -57,5 +28,5 @@ g++-latest -Wall -Werror -std=c++23 -fmodules-ts -lssl -lcrypto ../examples/tcp_
  -o ../bin/ex_tcp_echo_server
 
 g++-latest -Wall -Werror -std=c++23 -fmodules-ts ../tests/qtest.cppm -c -o ../bin/qtest.o
-g++-latest -Wall -Werror -std=c++23 -fmodules-ts -lssl -lcrypto ../tests/main.cpp ../bin/libnes_sockets.a \
+g++-latest -Wall -Werror -std=c++23 -fmodules-ts -lssl -lcrypto ../tests/main.cpp ../bin/libnes_sockets.a ../bin/qtest.o \
  -o ../bin/nes_socket_test

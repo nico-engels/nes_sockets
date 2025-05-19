@@ -1,19 +1,6 @@
-module;
-
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <numeric>
-#include <ranges>
-#include <source_location>
-#include <sstream>
-#include <string>
-
 export module qtest;
+
+import std;
 
 // Declaration
 export namespace nes::test {

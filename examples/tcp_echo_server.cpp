@@ -1,17 +1,4 @@
-import <algorithm>;
-import <charconv>;
-import <chrono>;
-import <cstddef>;
-import <iostream>;
-import <ranges>;
-import <stdexcept>;
-import <string>;
-import <span>;
-import <thread>;
-import <vector>;
-
-#include <format>
-#include <print>
+import std;
 
 import socket;
 import socket_serv;
@@ -115,10 +102,10 @@ try {
     }
 } catch (const exception& e) {
     println("Server died. Exception thrown: {}", e.what());
-    quick_exit(EXIT_FAILURE);
+    quick_exit(1);
 } catch (...) {
     println("Server died. Exception thrown.");
-    quick_exit(EXIT_FAILURE);
+    quick_exit(1);
 }
 
 void print_hex_view(span<const byte> data)

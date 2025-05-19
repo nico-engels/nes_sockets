@@ -1,10 +1,5 @@
-import <cctype>;
-import <chrono>;
-import <iomanip>;
-import <iostream>;
-import <string>;
-import <string_view>;
-import <thread>;
+import std;
+
 import socket;
 import socket_serv;
 import tls_socket;
